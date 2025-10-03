@@ -10,10 +10,6 @@ load_dotenv()
 class Settings:
     """Application settings loaded from environment variables."""
 
-    # GOOGLE_API_KEY: Optional[str] = os.getenv("GOOGLE_API_KEY")
-    GOOGLE_API_KEY: Optional[str] = "AIzaSyAtSmdIaDQPtEocsXmrKWTnicxooOrbs1o"
-    GENAI_MODEL: str = os.getenv("GENAI_MODEL", "gemini-2.5-flash")
-
     # Table detection settings
     MAX_ROWS_TO_SCAN: int = 50
     MIN_COLUMNS_FOR_TABLE: int = 2
