@@ -50,6 +50,8 @@ class TestSettings:
     def test_target_columns_defined(self):
         """Test that target columns are properly defined."""
         assert len(Settings.TARGET_COLUMNS) == 7
-        assert "wallet_name" in Settings.TARGET_COLUMNS
         assert "asset_name" in Settings.TARGET_COLUMNS
+        assert "asset_price" in Settings.TARGET_COLUMNS
+        assert "transaction_amount" in Settings.TARGET_COLUMNS
+        assert "fee" in Settings.TARGET_COLUMNS
         assert "currency" in Settings.TARGET_COLUMNS

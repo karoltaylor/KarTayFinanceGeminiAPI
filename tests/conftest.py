@@ -39,12 +39,12 @@ def sample_dataframe():
     """Sample DataFrame for testing."""
     return pd.DataFrame(
         {
-            "wallet_name": ["Wallet1", "Wallet2"],
             "asset_name": ["AAPL", "BTC"],
-            "asset_type": ["Stock", "Crypto"],
             "date": ["2024-01-10", "2024-01-11"],
-            "asset_item_price": [150.50, 45000.00],
+            "asset_price": [150.50, 45000.00],
             "volume": [10, 0.5],
+            "transaction_amount": [1505.00, 22500.00],
+            "fee": [5.0, 10.0],
             "currency": ["USD", "USD"],
         }
     )
@@ -52,14 +52,14 @@ def sample_dataframe():
 
 @pytest.fixture
 def valid_financial_record_data():
-    """Valid data for creating FinancialRecord."""
+    """Valid data for creating TransactionRecord."""
     return {
-        "wallet_name": "MyWallet",
         "asset_name": "AAPL",
-        "asset_type": "Stock",
         "date": "2024-01-10",
-        "asset_item_price": 150.50,
+        "asset_price": 150.50,
         "volume": 10,
+        "transaction_amount": 1505.00,
+        "fee": 5.0,
         "currency": "USD",
     }
 

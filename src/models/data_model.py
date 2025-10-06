@@ -6,18 +6,18 @@ from pydantic import BaseModel, Field, field_validator
 import pandas as pd
 
 
-class FinancialRecord(BaseModel):
-    """Individual financial record with validation."""
+class TransactionRecord(BaseModel):
+    """Individual transaction record with validation."""
 
-    wallet_name: str = Field(..., min_length=1, description="Name of the wallet")
     asset_name: str = Field(..., min_length=1, description="Name of the asset")
-    asset_type: str = Field(..., min_length=1, description="Type of the asset")
     date: datetime = Field(..., description="Transaction date")
-    asset_item_price: float = Field(..., description="Price per item")
+    asset_price: float = Field(..., description="Price per item")
     volume: float = Field(..., description="Number of assets/volume")
+    transaction_amount: float = Field(..., description="Total transaction amount")
+    fee: float = Field(default=0.0, ge=0, description="Transaction fee")
     currency: str = Field(..., min_length=1, max_length=10, description="Currency code")
 
-    @field_validator("asset_item_price", "volume")
+    @field_validator("asset_price", "volume", "transaction_amount")
     @classmethod
     def validate_positive_numbers(cls, v: float, info) -> float:
         """Ensure financial values are positive."""
@@ -32,8 +32,16 @@ class FinancialRecord(BaseModel):
         if isinstance(v, datetime):
             return v
         if isinstance(v, str):
-            # Try common date formats
-            for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y/%m/%d", "%d-%m-%Y"]:
+            # Try common date formats (including European DD.MM.YYYY)
+            for fmt in [
+                "%Y-%m-%d",
+                "%d/%m/%Y",
+                "%m/%d/%Y",
+                "%Y/%m/%d",
+                "%d-%m-%Y",
+                "%d.%m.%Y",
+                "%Y.%m.%d",
+            ]:
                 try:
                     return datetime.strptime(v, fmt)
                 except ValueError:
@@ -45,28 +53,28 @@ class FinancialRecord(BaseModel):
 
 
 class FinancialDataModel:
-    """Data model handler for financial records using pandas."""
+    """Data model handler for transaction records using pandas."""
 
     def __init__(self):
         """Initialize empty DataFrame with required columns."""
         self.columns = [
-            "wallet_name",
             "asset_name",
-            "asset_type",
             "date",
-            "asset_item_price",
+            "asset_price",
             "volume",
+            "transaction_amount",
+            "fee",
             "currency",
         ]
         self.df: pd.DataFrame = pd.DataFrame(columns=self.columns)
 
-    def add_record(self, record: FinancialRecord) -> None:
+    def add_record(self, record: TransactionRecord) -> None:
         """Add a single validated record to the DataFrame."""
         record_dict = record.model_dump()
         new_row = pd.DataFrame([record_dict])
         self.df = pd.concat([self.df, new_row], ignore_index=True)
 
-    def add_records(self, records: List[FinancialRecord]) -> None:
+    def add_records(self, records: List[TransactionRecord]) -> None:
         """Add multiple validated records to the DataFrame."""
         if not records:
             return
@@ -87,7 +95,7 @@ class FinancialDataModel:
 
         for idx, row in df.iterrows():
             try:
-                record = FinancialRecord(**row.to_dict())
+                record = TransactionRecord(**row.to_dict())
                 valid_records.append(record)
             except Exception as e:
                 errors.append(f"Row {idx}: {str(e)}")
@@ -113,10 +121,13 @@ class FinancialDataModel:
         """Get summary statistics of the data."""
         return {
             "total_records": len(self.df),
-            "unique_wallets": (
-                self.df["wallet_name"].nunique() if len(self.df) > 0 else 0
+            "unique_assets": (
+                self.df["asset_name"].nunique() if len(self.df) > 0 else 0
             ),
-            "unique_assets": self.df["asset_name"].nunique() if len(self.df) > 0 else 0,
+            "total_transaction_amount": (
+                self.df["transaction_amount"].sum() if len(self.df) > 0 else 0.0
+            ),
+            "total_fees": self.df["fee"].sum() if len(self.df) > 0 else 0.0,
             "date_range": {
                 "min": self.df["date"].min() if len(self.df) > 0 else None,
                 "max": self.df["date"].max() if len(self.df) > 0 else None,

@@ -171,5 +171,6 @@ class TestColumnMapper:
 
         assert "col1" in prompt
         assert "target1" in prompt
-        assert "wallet_name" in prompt
+        assert "asset_name" in prompt
+        assert "asset_price" in prompt
         assert "JSON" in prompt

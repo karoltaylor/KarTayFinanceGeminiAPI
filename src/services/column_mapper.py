@@ -114,12 +114,12 @@ TARGET SCHEMA (required columns):
 {json.dumps(target_columns, indent=2)}
 
 TARGET COLUMN DESCRIPTIONS:
-- wallet_name: Name of the wallet or account
 - asset_name: Name of the asset (stock, crypto, etc.)
-- asset_type: Type of asset (stock, crypto, bond, etc.)
 - date: Transaction or record date
-- asset_item_price: Price per unit/item of the asset
+- asset_price: Price per unit/item of the asset
 - volume: Quantity or number of assets
+- transaction_amount: Total transaction amount (can be calculated if missing)
+- fee: Transaction fee (set to 0 if not available)
 - currency: Currency code (USD, EUR, etc.)
 
 SOURCE COLUMNS:
@@ -138,18 +138,19 @@ INSTRUCTIONS:
 IMPORTANT: Return ONLY the JSON object, no additional text or explanation.
 
 Example output format:
-{{"wallet_name": "account_name",
-  "asset_name": "stock_symbol",
-  "asset_type": "security_type",
+{{"asset_name": "stock_symbol",
   "date": "transaction_date",
-  "asset_item_price": "price",
+  "asset_price": "price_per_share",
   "volume": "quantity",
+  "transaction_amount": "total_amount",
+  "fee": "transaction_fee",
   "currency": "curr"
 }}
 
 If a target column cannot be mapped, use null:
-{{"wallet_name": null,
-  "asset_name": "stock_name"
+{{"asset_name": "stock_name",
+  "fee": null,
+  "transaction_amount": null
 }}
 
 Now provide the mapping:"""

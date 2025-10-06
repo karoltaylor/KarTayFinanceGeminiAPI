@@ -2,11 +2,15 @@
 
 from pathlib import Path
 from typing import Optional, Dict, List
-import pandas as pd
 
 from ..loaders import FileLoaderFactory
-from ..services import TableDetector, ColumnMapper
-from ..models import FinancialDataModel
+from ..services import ColumnMapper, TransactionMapper
+from ..models import (
+    Transaction,
+    TransactionType,
+    AssetType,
+    PyObjectId,
+)
 from ..config.settings import Settings
 
 
@@ -17,7 +21,6 @@ class DataPipeline:
         self,
         api_key: Optional[str] = None,
         model_name: Optional[str] = None,
-        max_rows_to_scan: Optional[int] = None,
     ):
         """
         Initialize pipeline with required services.
@@ -25,38 +28,48 @@ class DataPipeline:
         Args:
             api_key: Google API key (uses Settings if None)
             model_name: GenAI model name (uses Settings if None)
-            max_rows_to_scan: Max rows to scan for header detection
         """
         self.file_loader = FileLoaderFactory()
-        self.table_detector = TableDetector(
-            max_rows_to_scan=max_rows_to_scan or Settings.MAX_ROWS_TO_SCAN
-        )
         self.column_mapper = ColumnMapper(api_key=api_key, model_name=model_name)
+        self.transaction_mapper = TransactionMapper()
         self.target_columns = Settings.TARGET_COLUMNS
 
-    def process_file(
-        self, filepath: str | Path, default_values: Optional[Dict[str, any]] = None
-    ) -> FinancialDataModel:
+    def process_file_to_transactions(
+        self,
+        filepath: str | Path,
+        wallet_name: str,
+        user_id: PyObjectId,
+        transaction_type: TransactionType = TransactionType.BUY,
+        asset_type: AssetType = AssetType.OTHER,
+        default_values: Optional[Dict[str, any]] = None,
+        wallets_collection=None,
+        assets_collection=None,
+    ) -> List[Transaction]:
         """
-        Process a file through the complete pipeline.
+        Process a file and convert to Transaction models.
 
         Steps:
-        1. Load file with automatic header detection (csv, txt, xls, xlsx)
-        2. Map columns using AI
-        3. Transform to target schema
-        4. Validate and load into FinancialDataModel
+        1. Load file with automatic header detection
+        2. Map columns using AI to TransactionRecord schema
+        3. Calculate missing values (asset_price from volume & amount)
+        4. Convert to Transaction models with wallet/asset references
 
         Args:
             filepath: Path to the file to process
+            wallet_name: Name of the wallet for these transactions
+            user_id: User ID who owns the wallet
+            transaction_type: Type of transactions (default: BUY)
+            asset_type: Default asset type
             default_values: Default values for unmapped columns
+            wallets_collection: MongoDB wallets collection (optional)
+            assets_collection: MongoDB assets collection (optional)
 
         Returns:
-            FinancialDataModel with loaded and validated data
+            List of Transaction models ready for MongoDB insertion
         """
         filepath = Path(filepath)
 
         # Step 1: Load file with automatic header detection
-        # The FileLoaderFactory now automatically detects headers
         table_df = self.file_loader.load_file(filepath)
 
         # Step 2: Map columns using AI
@@ -67,78 +80,15 @@ class DataPipeline:
             table_df, column_mapping, default_values
         )
 
-        # Step 4: Load into data model with validation
-        data_model = FinancialDataModel()
-        errors = data_model.load_from_dataframe(mapped_df)
+        # Step 4: Convert to Transaction models
+        transactions = self.transaction_mapper.dataframe_to_transactions(
+            df=mapped_df,
+            wallet_name=wallet_name,
+            user_id=user_id,
+            transaction_type=transaction_type,
+            asset_type=asset_type,
+            wallets_collection=wallets_collection,
+            assets_collection=assets_collection,
+        )
 
-        if errors:
-            print(f"Warning: {len(errors)} records failed validation:")
-            for error in errors[:10]:  # Show first 10 errors
-                print(f"  - {error}")
-            if len(errors) > 10:
-                print(f"  ... and {len(errors) - 10} more errors")
-
-        return data_model
-
-    def process_multiple_files(
-        self,
-        filepaths: List[str | Path],
-        default_values: Optional[Dict[str, any]] = None,
-    ) -> FinancialDataModel:
-        """
-        Process multiple files and combine into single data model.
-
-        Args:
-            filepaths: List of file paths to process
-            default_values: Default values for unmapped columns
-
-        Returns:
-            Combined FinancialDataModel
-        """
-        combined_model = FinancialDataModel()
-
-        for filepath in filepaths:
-            print(f"Processing: {filepath}")
-            try:
-                file_model = self.process_file(filepath, default_values)
-
-                # Merge into combined model
-                if not file_model.df.empty:
-                    combined_model.df = pd.concat(
-                        [combined_model.df, file_model.df], ignore_index=True
-                    )
-
-            except Exception as e:
-                print(f"Error processing {filepath}: {str(e)}")
-                continue
-
-        return combined_model
-
-    def get_column_mapping_preview(self, filepath: str | Path) -> Dict:
-        """
-        Preview the column mapping without full processing.
-
-        Useful for debugging and validation.
-
-        Returns:
-            Dictionary with source columns, detected mapping, and sample data
-        """
-        filepath = Path(filepath)
-
-        # Load table with automatic header detection
-        table_df = self.file_loader.load_file(filepath)
-
-        # Get header info if needed for debugging
-        raw_df = self.file_loader.load_raw(filepath)
-        _, header_row = self.table_detector.extract_table(raw_df)
-
-        # Get mapping
-        column_mapping = self.column_mapper.map_columns(table_df, self.target_columns)
-
-        return {
-            "header_row_index": header_row,
-            "source_columns": table_df.columns.tolist(),
-            "column_mapping": column_mapping,
-            "sample_data": table_df.head(3).to_dict("records"),
-            "total_rows": len(table_df),
-        }
+        return transactions

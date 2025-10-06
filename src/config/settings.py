@@ -10,19 +10,23 @@ load_dotenv()
 class Settings:
     """Application settings loaded from environment variables."""
 
+    # Google API settings
+    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY")
+    GENAI_MODEL: str = os.getenv("GENAI_MODEL")
+
     # Table detection settings
     MAX_ROWS_TO_SCAN: int = 50
     MIN_COLUMNS_FOR_TABLE: int = 2
     HEADER_DETECTION_THRESHOLD: float = 0.7
 
-    # Target columns for the data model
+    # Target columns for the TransactionRecord model
     TARGET_COLUMNS = [
-        "wallet_name",
         "asset_name",
-        "asset_type",
         "date",
-        "asset_item_price",
+        "asset_price",
         "volume",
+        "transaction_amount",
+        "fee",
         "currency",
     ]
 
@@ -33,4 +37,9 @@ class Settings:
             raise ValueError(
                 "GOOGLE_API_KEY must be set in environment variables. "
                 "Copy .env.example to .env and add your API key."
+            )
+        if not cls.GENAI_MODEL:
+            raise ValueError(
+                "GENAI_MODEL must be set in environment variables. "
+                "Copy .env.example to .env and add your model name."
             )
