@@ -53,6 +53,19 @@ async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown."""
     # Startup
     try:
+        # Show connection info (mask credentials)
+        db_url = MongoDBConfig.get_mongodb_url() or "Not set"
+        if "@" in db_url:
+            # Mask the password in the URL
+            parts = db_url.split("@")
+            creds = parts[0].split("://")[1].split(":")
+            masked_url = f"mongodb+srv://{creds[0]}:***@{parts[1]}"
+        else:
+            masked_url = db_url
+        
+        print(f"[INFO] Connecting to: {masked_url}")
+        print(f"[INFO] Database: {MongoDBConfig.get_mongodb_database()}")
+        
         MongoDBConfig.initialize_collections()
         print("[OK] MongoDB connected and initialized")
     except Exception as e:
@@ -218,7 +231,7 @@ async def health_check(db: Database = Depends(get_db)):
         return {
             "status": "healthy",
             "mongodb": "connected",
-            "database": MongoDBConfig.MONGODB_DATABASE,
+            "database": MongoDBConfig.get_mongodb_database(),
         }
     except Exception as e:
         return JSONResponse(
@@ -342,6 +355,51 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error registering user: {str(e)}")
+
+
+@app.get("/api/users/me", summary="Get current user info", tags=["Authentication"])
+async def get_current_user_info(
+    user_id: ObjectId = Depends(get_current_user),
+    db: Database = Depends(get_db)
+):
+    """
+    Get information about the currently authenticated user.
+    
+    **Authentication Required:** Include `X-User-ID` header with your user ID.
+    
+    **Returns:**
+    - User information including which database they're stored in
+    - Helpful for debugging which environment you're connected to
+    
+    **Errors:**
+    - 401: Invalid or missing X-User-ID header
+    - 404: User not found in current database
+    """
+    user = db.users.find_one({"_id": user_id})
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail=f"User {user_id} not found in database '{MongoDBConfig.get_mongodb_database()}'"
+        )
+    
+    # Mask sensitive connection info
+    db_url = MongoDBConfig.get_mongodb_url() or "Not set"
+    if "@" in db_url:
+        parts = db_url.split("@")
+        creds = parts[0].split("://")[1].split(":")
+        masked_url = f"mongodb+srv://{creds[0]}:***@{parts[1]}"
+    else:
+        masked_url = db_url
+    
+    return {
+        "user_id": str(user["_id"]),
+        "username": user.get("username"),
+        "email": user.get("email"),
+        "database": {
+            "name": MongoDBConfig.get_mongodb_database(),
+            "connection": masked_url
+        }
+    }
 
 
 # ==============================================================================

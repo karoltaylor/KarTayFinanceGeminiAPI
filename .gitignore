@@ -34,7 +34,12 @@ test_data/
 
 # Environment
 .env
+.env.*
 .venv
+
+# Environment configuration files with credentials
+config.production.env
+config.local.env
 
 # IDE
 .vscode/

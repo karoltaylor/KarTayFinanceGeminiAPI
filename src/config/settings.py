@@ -4,7 +4,15 @@ import os
 from typing import Optional
 from dotenv import load_dotenv
 
-load_dotenv()
+
+def _load_env_once():
+    """Load environment variables once."""
+    env_file = os.getenv("ENV_FILE", ".env")
+    load_dotenv(env_file, override=True)
+
+
+# Load environment on module import
+_load_env_once()
 
 
 class Settings:
