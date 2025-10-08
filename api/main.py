@@ -259,6 +259,9 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
     - 409: Username already taken (for new users)
     """
     try:
+        # Normalize email for consistent lookups
+        normalized_email = user_data.email.strip().lower()
+        
         # Check if user exists by email or oauth_id
         existing_user = None
         
@@ -269,7 +272,7 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
             })
         
         if not existing_user:
-            existing_user = db.users.find_one({"email": user_data.email})
+            existing_user = db.users.find_one({"email": normalized_email})
         
         if existing_user:
             # User exists - update OAuth info if provided
@@ -316,7 +319,7 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
         
         # Create new user
         user = User(
-            email=user_data.email,
+            email=normalized_email,
             username=sanitized_username,
             full_name=user_data.full_name,
             oauth_provider=user_data.oauth_provider,
@@ -331,7 +334,7 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
             "message": f"User '{sanitized_username}' registered successfully",
             "user_id": str(result.inserted_id),
             "username": sanitized_username,
-            "email": user_data.email,
+            "email": normalized_email,
             "is_new_user": True,
         }
     
@@ -368,12 +371,19 @@ async def list_wallets(
     **Errors:**
     - 401: Invalid or missing X-User-ID header
     """
-    wallets = list(db.wallets.find({"user_id": user_id}).skip(skip).limit(limit))
+    # Query for wallets - support both ObjectId and string formats for backwards compatibility
+    wallets = list(db.wallets.find({
+        "$or": [
+            {"user_id": user_id},
+            {"user_id": str(user_id)}
+        ]
+    }).skip(skip).limit(limit))
 
     # Convert ObjectId to string for JSON serialization
     for wallet in wallets:
         wallet["_id"] = str(wallet["_id"])
-        wallet["user_id"] = str(wallet["user_id"])
+        if isinstance(wallet.get("user_id"), ObjectId):
+            wallet["user_id"] = str(wallet["user_id"])
 
     return {"wallets": wallets, "count": len(wallets)}
 
@@ -402,7 +412,10 @@ async def create_wallet(
     """
     try:
         # Check if wallet with same name already exists for this user
-        existing_wallet = db.wallets.find_one({"user_id": user_id, "name": wallet_data.name})
+        existing_wallet = db.wallets.find_one({
+            "$or": [{"user_id": user_id}, {"user_id": str(user_id)}],
+            "name": wallet_data.name
+        })
         if existing_wallet:
             raise HTTPException(
                 status_code=409,
@@ -468,7 +481,10 @@ async def delete_wallet(
             raise HTTPException(status_code=400, detail="Invalid wallet ID format")
         
         # Find wallet (must belong to the user)
-        wallet = db.wallets.find_one({"_id": wallet_obj_id, "user_id": user_id})
+        wallet = db.wallets.find_one({
+            "_id": wallet_obj_id,
+            "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]
+        })
         if not wallet:
             raise HTTPException(
                 status_code=404,
@@ -698,14 +714,19 @@ async def list_transactions(
 
     # If wallet_name provided, find wallet_id first (must belong to user)
     if wallet_name:
-        wallet = db.wallets.find_one({"name": wallet_name, "user_id": user_id})
+        wallet = db.wallets.find_one({
+            "name": wallet_name,
+            "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]
+        })
         if wallet:
             query["wallet_id"] = wallet["_id"]
         else:
             return {"transactions": [], "count": 0, "message": "Wallet not found or not owned by user"}
     else:
         # Get all wallet IDs for this user
-        user_wallets = list(db.wallets.find({"user_id": user_id}, {"_id": 1}))
+        user_wallets = list(db.wallets.find({
+            "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]
+        }, {"_id": 1}))
         wallet_ids = [w["_id"] for w in user_wallets]
         query["wallet_id"] = {"$in": wallet_ids}
 
@@ -745,7 +766,10 @@ async def delete_wallet_transactions(
     - 404: Wallet not found or not owned by user
     """
     # Find wallet (must belong to the user)
-    wallet = db.wallets.find_one({"name": wallet_name, "user_id": user_id})
+    wallet = db.wallets.find_one({
+        "name": wallet_name,
+        "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]
+    })
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet not found or not owned by user")
 
@@ -784,7 +808,9 @@ async def get_statistics(
     - 401: Invalid or missing X-User-ID header
     """
     # Get user's wallet IDs
-    user_wallets = list(db.wallets.find({"user_id": user_id}, {"_id": 1}))
+    user_wallets = list(db.wallets.find({
+        "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]
+    }, {"_id": 1}))
     wallet_ids = [w["_id"] for w in user_wallets]
     
     stats = {
