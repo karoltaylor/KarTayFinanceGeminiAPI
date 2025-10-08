@@ -1,7 +1,13 @@
 """FastAPI application for financial transaction processing."""
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header, Query, Body, Path as PathParam
-from fastapi.responses import JSONResponse
+# ==============================================================================
+# IMPORTS
+# ==============================================================================
+
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header, Query, Body, Path as PathParam, Request
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from typing import Optional, Annotated
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -15,8 +21,32 @@ from src.pipeline import DataPipeline
 from src.models import TransactionType, AssetType
 from src.models.mongodb_models import Wallet, User
 from src.config.mongodb import MongoDBConfig, get_db
+from src.config.settings import Settings
 from pymongo.database import Database
 
+
+# ==============================================================================
+# REQUEST/RESPONSE MODELS
+# ==============================================================================
+
+class UserRegister(BaseModel):
+    """User registration request for OAuth providers (Google, Meta, etc.)."""
+    email: str = Field(..., description="User email from OAuth provider", min_length=3, max_length=255)
+    username: str = Field(..., description="Username (can be derived from email)", min_length=3, max_length=50)
+    full_name: Optional[str] = Field(None, description="User's full name", max_length=200)
+    oauth_provider: Optional[str] = Field(None, description="OAuth provider (google, meta, etc.)", max_length=50)
+    oauth_id: Optional[str] = Field(None, description="Unique ID from OAuth provider", max_length=255)
+
+
+class WalletCreate(BaseModel):
+    """Request model for creating a wallet."""
+    name: str = Field(..., min_length=1, max_length=200, description="Wallet name")
+    description: Optional[str] = Field(None, max_length=1000, description="Wallet description")
+
+
+# ==============================================================================
+# LIFESPAN & STARTUP
+# ==============================================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,15 +65,9 @@ async def lifespan(app: FastAPI):
     print("[OK] MongoDB connection closed")
 
 
-# Pydantic models for API requests
-class UserRegister(BaseModel):
-    """User registration request for OAuth providers (Google, Meta, etc.)."""
-    email: str
-    username: str
-    full_name: Optional[str] = None
-    oauth_provider: Optional[str] = None  # e.g., "google", "meta", "github"
-    oauth_id: Optional[str] = None  # Provider's user ID
-
+# ==============================================================================
+# DEPENDENCIES
+# ==============================================================================
 
 def get_current_user(
     user_id: Annotated[str, Header(
@@ -68,7 +92,10 @@ def get_current_user(
         raise HTTPException(status_code=401, detail=f"Invalid user ID: {str(e)}")
 
 
-# Initialize FastAPI app
+# ==============================================================================
+# APP INITIALIZATION
+# ==============================================================================
+
 app = FastAPI(
     title="Financial Transaction API",
     description="API for processing financial transaction files and storing in MongoDB",
@@ -76,23 +103,71 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware to allow frontend connections
-from fastapi.middleware.cors import CORSMiddleware
-
+# CORS middleware - allow frontend connections
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",      # React default
-        "http://localhost:5173",      # Vite default
-        "http://localhost:4200",      # Angular default
+        "http://localhost:3000",      # React default (dev)
+        "http://localhost:5173",      # Vite default (dev)
+        "http://localhost:4200",      # Angular default (dev)
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
+        "https://localhost:3000",     # HTTPS (dev with SSL)
+        "https://localhost:5173",     # HTTPS (dev with SSL)
     ],
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"],  # Allow all headers including X-User-ID
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Content-Type",               # For JSON request bodies
+        "Accept",                     # For response content negotiation
+        "X-User-ID",                  # Custom auth header
+        "Authorization",              # For future OAuth token support
+    ],
 )
 
+# Trusted Host middleware - prevent host header attacks
+if Settings.ALLOWED_HOSTS != ["*"]:
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=Settings.ALLOWED_HOSTS
+    )
+
+
+# HTTPS Enforcement Middleware
+@app.middleware("http")
+async def enforce_https(request: Request, call_next):
+    """
+    Enforce HTTPS in production.
+    
+    - In development (ENFORCE_HTTPS=false): Allows HTTP
+    - In production (ENFORCE_HTTPS=true): Redirects HTTP to HTTPS
+    """
+    if Settings.ENFORCE_HTTPS:
+        # Check if request is using HTTPS
+        if request.url.scheme != "https":
+            # Redirect to HTTPS version
+            https_url = request.url.replace(scheme="https")
+            return RedirectResponse(https_url, status_code=301)
+    
+    response = await call_next(request)
+    
+    # Add security headers to all responses
+    if Settings.ENFORCE_HTTPS:
+        # Strict Transport Security - force HTTPS for 1 year
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    
+    # Security headers (always applied)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    
+    return response
+
+
+# ==============================================================================
+# SYSTEM ENDPOINTS
+# ==============================================================================
 
 @app.get("/", summary="API Information", tags=["System"])
 async def root():
@@ -111,15 +186,15 @@ async def root():
         "authentication": "OAuth2 (Google, Meta, etc.)",
         "endpoints": {
             "health": "/health",
-            "user_register": "/api/users/register (POST) - After OAuth login",
-            "transactions_upload": "/api/transactions/upload",
+            "user_register": "/api/users/register (POST)",
             "list_wallets": "/api/wallets (GET)",
             "create_wallet": "/api/wallets (POST)",
             "delete_wallet": "/api/wallets/{wallet_id} (DELETE)",
             "list_assets": "/api/assets (GET)",
             "list_transactions": "/api/transactions (GET)",
+            "upload_transactions": "/api/transactions/upload (POST)",
             "delete_wallet_transactions": "/api/transactions/wallet/{wallet_name} (DELETE)",
-            "stats": "/api/stats",
+            "stats": "/api/stats (GET)",
         },
     }
 
@@ -139,7 +214,6 @@ async def health_check(db: Database = Depends(get_db)):
     - 503: Service unavailable (MongoDB disconnected)
     """
     try:
-        # Test MongoDB connection
         db.command("ping")
         return {
             "status": "healthy",
@@ -152,6 +226,10 @@ async def health_check(db: Database = Depends(get_db)):
             content={"status": "unhealthy", "mongodb": "disconnected", "error": str(e)},
         )
 
+
+# ==============================================================================
+# AUTHENTICATION ENDPOINTS
+# ==============================================================================
 
 @app.post("/api/users/register", summary="Register/Login with OAuth", tags=["Authentication"])
 async def register_user(user_data: UserRegister, db: Database = Depends(get_db)):
@@ -185,28 +263,24 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
         existing_user = None
         
         if user_data.oauth_id and user_data.oauth_provider:
-            # First, try to find by OAuth ID and provider
             existing_user = db.users.find_one({
                 "oauth_provider": user_data.oauth_provider,
                 "oauth_id": user_data.oauth_id
             })
         
         if not existing_user:
-            # Then try to find by email
             existing_user = db.users.find_one({"email": user_data.email})
         
         if existing_user:
-            # User exists - update OAuth info if provided and return user_id
+            # User exists - update OAuth info if provided
             if user_data.oauth_id and user_data.oauth_provider:
                 db.users.update_one(
                     {"_id": existing_user["_id"]},
-                    {
-                        "$set": {
-                            "oauth_provider": user_data.oauth_provider,
-                            "oauth_id": user_data.oauth_id,
-                            "updated_at": datetime.utcnow()
-                        }
-                    }
+                    {"$set": {
+                        "oauth_provider": user_data.oauth_provider,
+                        "oauth_id": user_data.oauth_id,
+                        "updated_at": datetime.utcnow()
+                    }}
                 )
             
             return {
@@ -218,7 +292,7 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
                 "is_new_user": False,
             }
         
-        # Check if username is taken (for new users)
+        # Check if username is taken
         if db.users.find_one({"username": user_data.username}):
             raise HTTPException(status_code=409, detail="Username already taken")
         
@@ -249,135 +323,9 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
         raise HTTPException(status_code=500, detail=f"Error registering user: {str(e)}")
 
 
-@app.post("/api/transactions/upload", summary="Upload transaction file", tags=["Transactions"])
-async def upload_transactions(
-    file: UploadFile = File(..., description="Transaction file (CSV, TXT, XLS, XLSX)"),
-    wallet_name: str = Form(..., description="Name of the wallet (creates if doesn't exist)"),
-    transaction_type: TransactionType = Form(
-        TransactionType.BUY, description="Type of transactions (buy, sell, etc.)"
-    ),
-    asset_type: AssetType = Form(AssetType.STOCK, description="Type of assets (stock, crypto, etc.)"),
-    user_id: ObjectId = Depends(get_current_user),
-    db: Database = Depends(get_db),
-):
-    """
-    Upload and process a transaction file with AI-powered column mapping.
-    
-    **Authentication Required:** Include `X-User-ID` header with your user ID.
-    
-    **Complete Processing Pipeline:**
-    1. Load file and detect header row
-    2. AI-powered column mapping to TransactionRecord schema (using Google Gemini)
-    3. Calculate missing values (asset price, transaction amount, fees)
-    4. Validate all data
-    5. Create/find wallet and assets in MongoDB
-    6. Save all transactions to MongoDB
-    
-    **Supported File Formats:**
-    - CSV (.csv, .txt)
-    - Excel 2007+ (.xlsx)
-    - Excel 97-2003 (.xls)
-    
-    **Form Data:**
-    - `file`: Transaction file to upload
-    - `wallet_name`: Wallet name (creates new wallet if doesn't exist)
-    - `transaction_type`: Type of transactions (default: buy)
-    - `asset_type`: Type of assets (default: stock)
-    
-    **Returns:**
-    - Processing status
-    - Total transactions saved
-    - Number of wallets/assets created
-    - Sample of transaction IDs
-    - Processing timestamp
-    
-    **Errors:**
-    - 400: Unsupported file type
-    - 422: No valid transactions in file
-    - 500: Processing error
-    """
-    temp_file = None
-
-    try:
-        # Validate file type
-        file_extension = Path(file.filename).suffix.lower()
-        if file_extension not in [".csv", ".txt", ".xls", ".xlsx"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file type: {file_extension}. "
-                f"Supported: .csv, .txt, .xls, .xlsx",
-            )
-
-        # Save uploaded file to temporary location
-        with tempfile.NamedTemporaryFile(
-            delete=False, suffix=file_extension
-        ) as temp_file:
-            content = await file.read()
-            temp_file.write(content)
-            temp_filepath = temp_file.name
-
-        # Initialize pipeline
-        pipeline = DataPipeline()
-
-        # Process file to Transaction models
-        transactions = pipeline.process_file_to_transactions(
-            filepath=temp_filepath,
-            wallet_name=wallet_name,
-            user_id=user_id,
-            transaction_type=transaction_type,
-            asset_type=asset_type,
-            wallets_collection=db.wallets,
-            assets_collection=db.assets,
-        )
-
-        if not transactions:
-            raise HTTPException(
-                status_code=422,
-                detail="No valid transactions could be created from the file. "
-                "Check file format and data quality.",
-            )
-
-        # Insert transactions into MongoDB
-        transaction_dicts = [t.model_dump(by_alias=True) for t in transactions]
-        result = db.transactions.insert_many(transaction_dicts)
-
-        # Get statistics
-        inserted_count = len(result.inserted_ids)
-
-        # Get wallet and asset info
-        wallet_count = len(pipeline.transaction_mapper._wallet_cache)
-        asset_count = len(pipeline.transaction_mapper._asset_cache)
-
-        return {
-            "status": "success",
-            "message": f"Successfully processed {inserted_count} transactions",
-            "data": {
-                "filename": file.filename,
-                "wallet_name": wallet_name,
-                "transaction_type": transaction_type.value,
-                "asset_type": asset_type.value,
-                "total_transactions": inserted_count,
-                "wallets_created": wallet_count,
-                "assets_created": asset_count,
-                "inserted_ids": [str(id) for id in result.inserted_ids[:10]],
-                "more_ids": (
-                    len(result.inserted_ids) - 10
-                    if len(result.inserted_ids) > 10
-                    else 0
-                ),
-                "processed_at": datetime.utcnow().isoformat(),
-            },
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
-    finally:
-        # Clean up temporary file
-        if temp_file and os.path.exists(temp_filepath):
-            os.unlink(temp_filepath)
-
+# ==============================================================================
+# WALLET ENDPOINTS
+# ==============================================================================
 
 @app.get("/api/wallets", summary="List user's wallets", tags=["Wallets"])
 async def list_wallets(
@@ -404,18 +352,12 @@ async def list_wallets(
     """
     wallets = list(db.wallets.find({"user_id": user_id}).skip(skip).limit(limit))
 
-    # Convert ObjectId to string
+    # Convert ObjectId to string for JSON serialization
     for wallet in wallets:
         wallet["_id"] = str(wallet["_id"])
         wallet["user_id"] = str(wallet["user_id"])
 
     return {"wallets": wallets, "count": len(wallets)}
-
-
-class WalletCreate(BaseModel):
-    """Request model for creating a wallet."""
-    name: str = Field(..., min_length=1, max_length=200, description="Wallet name")
-    description: Optional[str] = Field(None, max_length=1000, description="Wallet description")
 
 
 @app.post("/api/wallets", summary="Create a wallet", tags=["Wallets"])
@@ -484,7 +426,7 @@ async def delete_wallet(
     db: Database = Depends(get_db)
 ):
     """
-    Delete a wallet and optionally its associated transactions.
+    Delete a wallet and all its associated transactions.
     
     **Authentication Required:** Include `X-User-ID` header with your user ID.
     
@@ -493,11 +435,12 @@ async def delete_wallet(
     
     **Returns:**
     - Success message with deletion details
+    - Number of transactions deleted
     
     **Errors:**
+    - 400: Invalid wallet ID format
     - 401: Invalid or missing X-User-ID header
     - 404: Wallet not found or not owned by user
-    - 400: Invalid wallet ID format
     """
     try:
         # Validate wallet_id format
@@ -514,10 +457,8 @@ async def delete_wallet(
                 detail="Wallet not found or not owned by user"
             )
         
-        # Count transactions associated with this wallet
+        # Count and delete transactions associated with this wallet
         transaction_count = db.transactions.count_documents({"wallet_id": wallet_obj_id})
-        
-        # Delete all transactions for this wallet
         if transaction_count > 0:
             db.transactions.delete_many({"wallet_id": wallet_obj_id})
         
@@ -536,6 +477,10 @@ async def delete_wallet(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting wallet: {str(e)}")
 
+
+# ==============================================================================
+# ASSET ENDPOINTS
+# ==============================================================================
 
 @app.get("/api/assets", summary="List assets", tags=["Assets"])
 async def list_assets(
@@ -570,6 +515,139 @@ async def list_assets(
         asset["_id"] = str(asset["_id"])
 
     return {"assets": assets, "count": len(assets), "filter": query}
+
+
+# ==============================================================================
+# TRANSACTION ENDPOINTS
+# ==============================================================================
+
+@app.post("/api/transactions/upload", summary="Upload transaction file", tags=["Transactions"])
+async def upload_transactions(
+    file: UploadFile = File(..., description="Transaction file (CSV, TXT, XLS, XLSX)"),
+    wallet_name: str = Form(..., description="Name of the wallet (creates if doesn't exist)"),
+    transaction_type: TransactionType = Form(
+        TransactionType.BUY, description="Type of transactions (buy, sell, etc.)"
+    ),
+    asset_type: AssetType = Form(AssetType.STOCK, description="Type of assets (stock, crypto, etc.)"),
+    user_id: ObjectId = Depends(get_current_user),
+    db: Database = Depends(get_db),
+):
+    """
+    Upload and process a transaction file with AI-powered column mapping.
+    
+    **Authentication Required:** Include `X-User-ID` header with your user ID.
+    
+    **Complete Processing Pipeline:**
+    1. Load file and detect header row
+    2. AI-powered column mapping to TransactionRecord schema (using Google Gemini)
+    3. Calculate missing values (asset price, transaction amount, fees)
+    4. Validate all data
+    5. Create/find wallet and assets in MongoDB
+    6. Save all transactions to MongoDB
+    
+    **Supported File Formats:**
+    - CSV (.csv, .txt)
+    - Excel 2007+ (.xlsx)
+    - Excel 97-2003 (.xls)
+    
+    **Form Data:**
+    - `file`: Transaction file to upload
+    - `wallet_name`: Wallet name (creates new wallet if doesn't exist)
+    - `transaction_type`: Type of transactions (default: buy)
+    - `asset_type`: Type of assets (default: stock)
+    
+    **Returns:**
+    - Processing status
+    - Total transactions saved
+    - Number of wallets/assets created
+    - Sample of transaction IDs
+    - Processing timestamp
+    
+    **Errors:**
+    - 400: Unsupported file type
+    - 401: Invalid or missing X-User-ID header
+    - 422: No valid transactions in file
+    - 500: Processing error
+    """
+    temp_file = None
+
+    try:
+        # Validate file type
+        file_extension = Path(file.filename).suffix.lower()
+        if file_extension not in [".csv", ".txt", ".xls", ".xlsx"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file_extension}. "
+                f"Supported: .csv, .txt, .xls, .xlsx",
+            )
+
+        # Save uploaded file to temporary location
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=file_extension
+        ) as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_filepath = temp_file.name
+
+        # Initialize pipeline
+        pipeline = DataPipeline()
+
+        # Process file to Transaction models
+        transactions = pipeline.process_file_to_transactions(
+            filepath=temp_filepath,
+            wallet_name=wallet_name,
+            user_id=user_id,
+            transaction_type=transaction_type,
+            asset_type=asset_type,
+            wallets_collection=db.wallets,
+            assets_collection=db.assets,
+        )
+
+        if not transactions:
+            raise HTTPException(
+                status_code=422,
+                detail="No valid transactions could be created from the file. "
+                "Check file format and data quality.",
+            )
+
+        # Insert transactions into MongoDB
+        transaction_dicts = [t.model_dump(by_alias=True) for t in transactions]
+        result = db.transactions.insert_many(transaction_dicts)
+
+        # Get statistics
+        inserted_count = len(result.inserted_ids)
+        wallet_count = len(pipeline.transaction_mapper._wallet_cache)
+        asset_count = len(pipeline.transaction_mapper._asset_cache)
+
+        return {
+            "status": "success",
+            "message": f"Successfully processed {inserted_count} transactions",
+            "data": {
+                "filename": file.filename,
+                "wallet_name": wallet_name,
+                "transaction_type": transaction_type.value,
+                "asset_type": asset_type.value,
+                "total_transactions": inserted_count,
+                "wallets_created": wallet_count,
+                "assets_created": asset_count,
+                "inserted_ids": [str(id) for id in result.inserted_ids[:10]],
+                "more_ids": (
+                    len(result.inserted_ids) - 10
+                    if len(result.inserted_ids) > 10
+                    else 0
+                ),
+                "processed_at": datetime.utcnow().isoformat(),
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+    finally:
+        # Clean up temporary file
+        if temp_file and os.path.exists(temp_filepath):
+            os.unlink(temp_filepath)
 
 
 @app.get("/api/transactions", summary="List transactions", tags=["Transactions"])
@@ -663,6 +741,10 @@ async def delete_wallet_transactions(
         "deleted_count": result.deleted_count,
     }
 
+
+# ==============================================================================
+# STATISTICS ENDPOINTS
+# ==============================================================================
 
 @app.get("/api/stats", summary="Get user statistics", tags=["Statistics"])
 async def get_statistics(

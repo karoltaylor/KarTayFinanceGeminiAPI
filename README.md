@@ -24,10 +24,14 @@ Create `.env` file:
 # Required
 GOOGLE_API_KEY=your_google_api_key_here
 
-# Optional
+# Optional - Database
 GENAI_MODEL=gemini-1.5-flash
 MONGODB_URL=mongodb://localhost:27017/
 MONGODB_DATABASE=financial_tracker
+
+# Optional - Security (Production)
+ENFORCE_HTTPS=false                    # Set to 'true' in production
+ALLOWED_HOSTS=localhost,127.0.0.1      # Comma-separated list of allowed hosts
 ```
 
 Get Google API Key: https://makersuite.google.com/app/apikey
@@ -674,6 +678,184 @@ curl -H "X-User-ID: YOUR_USER_ID" \
 - `requirements.txt` - Python dependencies
 - `.env.example` - Environment template
 - `pytest.ini` - Test configuration
+
+---
+
+## HTTPS & Production Deployment
+
+### Development (HTTP)
+
+Default configuration allows HTTP for local development:
+
+```env
+ENFORCE_HTTPS=false
+```
+
+**Access via:** http://localhost:8000
+
+### Production (HTTPS Only)
+
+#### Step 1: Enable HTTPS Enforcement
+
+Update `.env`:
+
+```env
+ENFORCE_HTTPS=true
+ALLOWED_HOSTS=yourdomain.com,api.yourdomain.com
+```
+
+#### Step 2: Configure SSL Certificate
+
+**Option A: Using Nginx as Reverse Proxy (Recommended)**
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name api.yourdomain.com;
+    
+    ssl_certificate /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+    
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name api.yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+**Option B: Using Uvicorn with SSL**
+
+```bash
+uvicorn api.main:app \
+  --host 0.0.0.0 \
+  --port 443 \
+  --ssl-keyfile=./privkey.pem \
+  --ssl-certfile=./fullchain.pem
+```
+
+**Option C: Using Cloud Provider (AWS, GCP, Azure)**
+
+Deploy behind:
+- AWS Application Load Balancer (ALB) with ACM certificate
+- GCP Load Balancer with managed SSL
+- Azure Application Gateway with SSL
+
+#### Step 3: Update CORS for Production
+
+Update `api/main.py`:
+
+```python
+allow_origins=[
+    "https://yourdomain.com",      # Production frontend
+    "https://www.yourdomain.com",
+],
+```
+
+### Security Headers Explained
+
+When `ENFORCE_HTTPS=true`, the following headers are added:
+
+#### 1. **Strict-Transport-Security** (HSTS)
+```
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+```
+- Forces browsers to use HTTPS for 1 year
+- Prevents downgrade attacks
+- Includes all subdomains
+
+#### 2. **X-Content-Type-Options**
+```
+X-Content-Type-Options: nosniff
+```
+- Prevents browsers from MIME-sniffing
+- Protects against XSS attacks
+
+#### 3. **X-Frame-Options**
+```
+X-Frame-Options: DENY
+```
+- Prevents clickjacking attacks
+- API cannot be embedded in iframes
+
+#### 4. **X-XSS-Protection**
+```
+X-XSS-Protection: 1; mode=block
+```
+- Enables browser XSS filter
+- Blocks page if XSS attack detected
+
+#### 5. **Referrer-Policy**
+```
+Referrer-Policy: strict-origin-when-cross-origin
+```
+- Controls referrer information
+- Protects user privacy
+
+### Testing HTTPS Locally
+
+Generate self-signed certificate for testing:
+
+```bash
+# Generate certificate
+openssl req -x509 -newkey rsa:4096 \
+  -keyout key.pem -out cert.pem \
+  -days 365 -nodes \
+  -subj "/CN=localhost"
+
+# Run with SSL
+uvicorn api.main:app --ssl-keyfile=key.pem --ssl-certfile=cert.pem
+```
+
+**Access via:** https://localhost:8000
+
+### What Happens in Production
+
+#### HTTP Request (Port 80):
+```
+http://api.yourdomain.com/api/wallets
+   ↓
+301 Redirect to HTTPS
+   ↓
+https://api.yourdomain.com/api/wallets
+```
+
+#### Direct HTTPS Request:
+```
+https://api.yourdomain.com/api/wallets
+   ↓
+Request allowed
+   ↓
+Response with security headers
+```
+
+#### HTTP Request with ENFORCE_HTTPS=true:
+```
+Client: http://localhost:8000/api/wallets
+   ↓
+Middleware: Detects HTTP (not HTTPS)
+   ↓
+Response: 301 Redirect → https://localhost:8000/api/wallets
+```
+
+### Production Checklist
+
+- [ ] Set `ENFORCE_HTTPS=true` in production `.env`
+- [ ] Configure SSL certificate (Let's Encrypt, ACM, etc.)
+- [ ] Update `ALLOWED_HOSTS` with your domain
+- [ ] Update CORS `allow_origins` with production URLs
+- [ ] Test HTTPS redirect works
+- [ ] Verify security headers in response
+- [ ] Enable firewall rules (allow 443, block 80 or redirect)
 
 ---
 

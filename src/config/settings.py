@@ -14,6 +14,10 @@ class Settings:
     GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY")
     GENAI_MODEL: str = os.getenv("GENAI_MODEL")
 
+    # Security settings
+    ENFORCE_HTTPS: bool = os.getenv("ENFORCE_HTTPS", "false").lower() == "true"
+    ALLOWED_HOSTS: list = os.getenv("ALLOWED_HOSTS", "*").split(",")
+
     # Table detection settings
     MAX_ROWS_TO_SCAN: int = 50
     MIN_COLUMNS_FOR_TABLE: int = 2
