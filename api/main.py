@@ -292,14 +292,32 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
                 "is_new_user": False,
             }
         
-        # Check if username is taken
-        if db.users.find_one({"username": user_data.username}):
-            raise HTTPException(status_code=409, detail="Username already taken")
+        # Sanitize username - replace spaces and invalid chars with underscores
+        sanitized_username = user_data.username.strip().lower()
+        sanitized_username = "".join(
+            c if (c.isalnum() or c in "_-") else "_" 
+            for c in sanitized_username
+        )
+        
+        # If username is still invalid, generate from email
+        if not sanitized_username or len(sanitized_username) < 3:
+            sanitized_username = user_data.email.split("@")[0].lower()
+            sanitized_username = "".join(
+                c if (c.isalnum() or c in "_-") else "_" 
+                for c in sanitized_username
+            )
+        
+        # Check if username is taken, add suffix if needed
+        base_username = sanitized_username
+        counter = 1
+        while db.users.find_one({"username": sanitized_username}):
+            sanitized_username = f"{base_username}_{counter}"
+            counter += 1
         
         # Create new user
         user = User(
             email=user_data.email,
-            username=user_data.username,
+            username=sanitized_username,
             full_name=user_data.full_name,
             oauth_provider=user_data.oauth_provider,
             oauth_id=user_data.oauth_id,
@@ -310,9 +328,9 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
         
         return {
             "status": "success",
-            "message": f"User '{user_data.username}' registered successfully",
+            "message": f"User '{sanitized_username}' registered successfully",
             "user_id": str(result.inserted_id),
-            "username": user_data.username,
+            "username": sanitized_username,
             "email": user_data.email,
             "is_new_user": True,
         }
