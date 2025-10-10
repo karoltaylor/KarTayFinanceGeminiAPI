@@ -5,6 +5,7 @@ from unittest.mock import patch, MagicMock
 
 from src.pipeline.data_pipeline import DataPipeline
 from src.models import TransactionType, AssetType
+from bson import ObjectId
 
 
 class TestDataPipeline:
@@ -48,11 +49,13 @@ class TestDataPipeline:
         mock_genai.GenerativeModel.return_value = mock_model
 
         pipeline = DataPipeline(api_key="test_key")
+        user_id = ObjectId()
 
         # Process file to transactions
         transactions = pipeline.process_file_to_transactions(
             filepath=filepath,
             wallet_name="Test Wallet",
+            user_id=user_id,
             transaction_type=TransactionType.BUY,
             asset_type=AssetType.STOCK,
         )

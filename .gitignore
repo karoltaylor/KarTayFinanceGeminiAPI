@@ -28,6 +28,10 @@ wheels/
 .coverage
 htmlcov/
 .tox/
+coverage.xml
+coverage.svg
+pytest_cache/
+.mypy_cache/
 
 # Test Data
 test_data/
@@ -36,6 +40,7 @@ test_data/
 .env
 .env.*
 .venv
+.active_env
 
 # Environment configuration files with credentials
 config.production.env
@@ -46,4 +51,13 @@ config.local.env
 .idea/
 *.swp
 *.swo
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+env.json
+
+# Temporary files
+*.log
+logs/
 

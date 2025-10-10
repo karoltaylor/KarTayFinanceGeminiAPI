@@ -21,10 +21,12 @@ class TestWallet:
 
     def test_create_wallet_with_valid_data(self):
         """Test creating a wallet with valid data."""
-        wallet = Wallet(name="My Savings", description="Personal savings wallet")
+        user_id = ObjectId()
+        wallet = Wallet(user_id=user_id, name="My Savings", description="Personal savings wallet")
 
         assert wallet.name == "My Savings"
         assert wallet.description == "Personal savings wallet"
+        assert wallet.user_id == user_id
         assert wallet.id is not None
         assert isinstance(wallet.id, ObjectId)
         assert isinstance(wallet.created_at, datetime)
@@ -32,21 +34,24 @@ class TestWallet:
 
     def test_create_wallet_without_description(self):
         """Test creating a wallet without description."""
-        wallet = Wallet(name="Investment Portfolio")
+        user_id = ObjectId()
+        wallet = Wallet(user_id=user_id, name="Investment Portfolio")
 
         assert wallet.name == "Investment Portfolio"
         assert wallet.description is None
 
     def test_wallet_name_strips_whitespace(self):
         """Test that wallet name strips whitespace."""
-        wallet = Wallet(name="  My Wallet  ")
+        user_id = ObjectId()
+        wallet = Wallet(user_id=user_id, name="  My Wallet  ")
 
         assert wallet.name == "My Wallet"
 
     def test_wallet_empty_name_raises_error(self):
         """Test that empty wallet name raises error."""
+        user_id = ObjectId()
         with pytest.raises(ValueError, match="Wallet name cannot be empty"):
-            Wallet(name="   ")
+            Wallet(user_id=user_id, name="   ")
 
 
 class TestAsset:

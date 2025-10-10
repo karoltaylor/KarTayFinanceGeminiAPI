@@ -3,12 +3,32 @@
 import os
 from typing import Optional
 from dotenv import load_dotenv
+from pathlib import Path
+
+
+def _get_active_env_file():
+    """Get the active environment file, checking for .active_env marker file first."""
+    # Check for .active_env marker file (created by start_api.py)
+    marker_file = Path(".active_env")
+    if marker_file.exists():
+        try:
+            env_file = marker_file.read_text().strip()
+            if env_file and Path(env_file).exists():
+                return env_file
+        except:
+            pass
+    
+    # Fallback to ENV_FILE environment variable or .env
+    return os.getenv("ENV_FILE", ".env")
 
 
 def _load_env_once():
     """Load environment variables once."""
-    env_file = os.getenv("ENV_FILE", ".env")
-    load_dotenv(env_file, override=True)
+    # Only try to load .env files if not running in Lambda
+    # In Lambda, environment variables are already set by AWS
+    if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        env_file = _get_active_env_file()
+        load_dotenv(env_file, override=False)  # Don't override existing env vars
 
 
 # Load environment on module import

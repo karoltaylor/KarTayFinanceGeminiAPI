@@ -1,0 +1,184 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  KarTay Finance Google API - FastAPI application for financial transaction processing
+
+# Global configurations applied to all functions
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.13  # Lambda max version (3.13 not yet supported)
+    # Enable X-Ray tracing for monitoring
+    Tracing: Active
+
+Parameters:
+  MongoDBUrl:
+    Type: String
+    Description: MongoDB connection URL (e.g., MongoDB Atlas connection string)
+    NoEcho: true
+  
+  MongoDBDatabase:
+    Type: String
+    Default: financial_tracker
+    Description: MongoDB database name
+  
+  GoogleApiKey:
+    Type: String
+    Description: Google Generative AI API Key
+    NoEcho: true
+  
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Deployment environment
+  
+  AllowedOrigins:
+    Type: CommaDelimitedList
+    Default: '*'
+    Description: Comma-separated list of allowed CORS origins (use * for all)
+
+Resources:
+  # FastAPI Lambda Function
+  FinanceAPIFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'kartay-finance-api-${Environment}'
+      Description: Financial transaction processing API with AI-powered column mapping
+      CodeUri: .
+      Handler: lambda_handler.handler
+      Timeout: 30
+      MemorySize: 1024  # Increased for AI processing
+      Environment:
+        Variables:
+          MONGODB_URL: !Ref MongoDBUrl
+          MONGODB_DATABASE: !Ref MongoDBDatabase
+          GOOGLE_API_KEY: !Ref GoogleApiKey
+          GENAI_MODEL: 'models/gemini-2.5-flash'
+          ALLOWED_HOSTS: '*'
+          ENFORCE_HTTPS: 'false'
+          ENVIRONMENT: !Ref Environment
+      # API Gateway Event Source
+      Events:
+        # Catch-all for all HTTP methods and paths
+        ApiRoot:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
+            RestApiId: !Ref FinanceAPIGateway
+        ApiProxy:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+            RestApiId: !Ref FinanceAPIGateway
+      # IAM Policies
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSXRayDaemonWriteAccess
+        # Add custom policies if needed (e.g., S3 access, Secrets Manager)
+        # - Statement:
+        #   - Effect: Allow
+        #     Action:
+        #       - secretsmanager:GetSecretValue
+        #     Resource: !Ref MongoDBSecret
+
+  # API Gateway
+  FinanceAPIGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub 'kartay-finance-api-${Environment}'
+      StageName: !Ref Environment
+      # Enable CORS
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-User-ID,Authorization,Accept'"
+        AllowOrigin: !Sub
+          - "'${Origins}'"
+          - Origins: !Join [',', !Ref AllowedOrigins]
+        AllowCredentials: true
+      # Enable API Gateway access logging
+      #AccessLogSetting:
+      #  DestinationArn: !GetAtt ApiGatewayLogGroup.Arn
+      #  Format: '$context.requestId $context.extendedRequestId $context.identity.sourceIp $context.requestTime $context.httpMethod $context.routeKey $context.status $context.protocol $context.responseLength'
+      # Enable throttling via MethodSettings
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          ThrottlingBurstLimit: 1000
+          ThrottlingRateLimit: 500
+          #LoggingLevel: OFF
+          DataTraceEnabled: false
+          MetricsEnabled: false
+      # API Gateway tracing
+      TracingEnabled: true
+      # Binary media types for file uploads
+      BinaryMediaTypes:
+        - 'multipart/form-data'
+        - 'application/octet-stream'
+
+  # CloudWatch Log Group for API Gateway
+  ApiGatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/apigateway/kartay-finance-api-${Environment}'
+      RetentionInDays: 30
+
+  # CloudWatch Log Group for Lambda
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/kartay-finance-api-${Environment}'
+      RetentionInDays: 30
+
+  # Optional: Store MongoDB credentials in Secrets Manager
+  # MongoDBSecret:
+  #   Type: AWS::SecretsManager::Secret
+  #   Properties:
+  #     Name: !Sub 'kartay-finance-mongodb-${Environment}'
+  #     Description: MongoDB connection credentials
+  #     SecretString: !Sub |
+  #       {
+  #         "mongodb_url": "${MongoDBUrl}",
+  #         "mongodb_database": "${MongoDBDatabase}"
+  #       }
+
+# Outputs for easy reference
+Outputs:
+  # API Gateway endpoint URL
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${FinanceAPIGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/"
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiEndpoint'
+  
+  # API documentation URLs
+  ApiDocsUrl:
+    Description: "API Documentation (Swagger UI)"
+    Value: !Sub "https://${FinanceAPIGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/docs"
+  
+  ApiRedocUrl:
+    Description: "API Documentation (ReDoc)"
+    Value: !Sub "https://${FinanceAPIGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/redoc"
+  
+  # Lambda function
+  FunctionArn:
+    Description: "Lambda Function ARN"
+    Value: !GetAtt FinanceAPIFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionArn'
+  
+  # CloudWatch Logs
+  LambdaLogGroupName:
+    Description: "Lambda CloudWatch Log Group"
+    Value: !Ref LambdaLogGroup
+  
+  ApiGatewayLogGroupName:
+    Description: "API Gateway CloudWatch Log Group"
+    Value: !Ref ApiGatewayLogGroup
+

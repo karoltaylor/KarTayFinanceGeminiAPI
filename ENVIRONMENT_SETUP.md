@@ -17,7 +17,7 @@ MONGODB_DATABASE=finance_tracking
 
 ### `config.production.env` - Production (AWS MongoDB Atlas)
 ```
-MONGODB_URL=mongodb+srv://kartayaws_db_user:iMyi3FWv8wqoMIbZ@cluster0.pfcsf6t.mongodb.net/
+MONGODB_URL=
 MONGODB_DATABASE=finance_tracking
 ```
 

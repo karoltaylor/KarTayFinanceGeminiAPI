@@ -12,6 +12,7 @@ from src.models import (
     AssetType,
     PyObjectId,
 )
+from bson import ObjectId
 
 
 class TestTransactionMapper:
@@ -101,14 +102,17 @@ class TestTransactionMapper:
     def test_get_or_create_wallet_in_memory(self):
         """Test creating wallet in memory."""
         mapper = TransactionMapper()
+        user_id = ObjectId()
 
-        wallet_id = mapper.get_or_create_wallet("Test Wallet")
+        wallet_id = mapper.get_or_create_wallet("Test Wallet", user_id)
 
         assert isinstance(wallet_id, PyObjectId)
-        assert "Test Wallet" in mapper._wallet_cache
+        # Cache key format is now "user_id:wallet_name"
+        cache_key = f"{str(user_id)}:Test Wallet"
+        assert cache_key in mapper._wallet_cache
 
-        # Should return same ID for same name
-        wallet_id2 = mapper.get_or_create_wallet("Test Wallet")
+        # Should return same ID for same name and user
+        wallet_id2 = mapper.get_or_create_wallet("Test Wallet", user_id)
         assert wallet_id == wallet_id2
 
     def test_get_or_create_asset_in_memory(self):
@@ -128,6 +132,7 @@ class TestTransactionMapper:
     def test_dataframe_to_transactions(self):
         """Test converting DataFrame to Transaction models."""
         mapper = TransactionMapper()
+        user_id = ObjectId()
 
         df = pd.DataFrame(
             {
@@ -144,6 +149,7 @@ class TestTransactionMapper:
         transactions = mapper.dataframe_to_transactions(
             df=df,
             wallet_name="My Wallet",
+            user_id=user_id,
             transaction_type=TransactionType.BUY,
             asset_type=AssetType.STOCK,
         )
@@ -160,6 +166,7 @@ class TestTransactionMapper:
     def test_dataframe_to_transactions_with_missing_asset_price(self):
         """Test conversion when asset_price needs to be calculated."""
         mapper = TransactionMapper()
+        user_id = ObjectId()
 
         df = pd.DataFrame(
             {
@@ -172,7 +179,7 @@ class TestTransactionMapper:
         )
 
         transactions = mapper.dataframe_to_transactions(
-            df=df, wallet_name="My Wallet", transaction_type=TransactionType.BUY
+            df=df, wallet_name="My Wallet", user_id=user_id, transaction_type=TransactionType.BUY
         )
 
         assert len(transactions) == 1
@@ -181,6 +188,7 @@ class TestTransactionMapper:
     def test_transaction_records_to_transactions(self):
         """Test converting TransactionRecord list to Transaction models."""
         mapper = TransactionMapper()
+        user_id = ObjectId()
 
         records = [
             TransactionRecord(
@@ -206,6 +214,7 @@ class TestTransactionMapper:
         transactions = mapper.transaction_records_to_transactions(
             records=records,
             wallet_name="Investment Wallet",
+            user_id=user_id,
             transaction_type=TransactionType.BUY,
             asset_type=AssetType.STOCK,
         )
@@ -218,9 +227,10 @@ class TestTransactionMapper:
     def test_clear_cache(self):
         """Test clearing wallet and asset caches."""
         mapper = TransactionMapper()
+        user_id = ObjectId()
 
         # Create some cached entries
-        mapper.get_or_create_wallet("Wallet1")
+        mapper.get_or_create_wallet("Wallet1", user_id)
         mapper.get_or_create_asset("AAPL", AssetType.STOCK)
 
         assert len(mapper._wallet_cache) > 0
@@ -235,6 +245,7 @@ class TestTransactionMapper:
     def test_dataframe_with_invalid_rows(self):
         """Test handling DataFrame with some invalid rows."""
         mapper = TransactionMapper()
+        user_id = ObjectId()
 
         df = pd.DataFrame(
             {
@@ -247,7 +258,7 @@ class TestTransactionMapper:
             }
         )
 
-        transactions = mapper.dataframe_to_transactions(df=df, wallet_name="My Wallet")
+        transactions = mapper.dataframe_to_transactions(df=df, wallet_name="My Wallet", user_id=user_id)
 
         # Only valid rows should be converted
         assert len(transactions) == 1

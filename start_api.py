@@ -59,7 +59,7 @@ Examples:
     parser.add_argument(
         "--env",
         type=str,
-        default="local",
+       # default="local",
         choices=available_envs if available_envs else ["local"],
         help=f"Environment to use. Available: {', '.join(available_envs) if available_envs else 'none found'}"
     )
@@ -90,6 +90,10 @@ Examples:
     try:
         env_file = get_env_file_path(args.env)
         os.environ["ENV_FILE"] = env_file
+        
+        # Write to .active_env file so hot-reload workers can pick it up
+        from pathlib import Path
+        Path(".active_env").write_text(env_file)
         
         print("=" * 70)
         print("Starting Financial Transaction API")

@@ -1,0 +1,104 @@
+# SAM ignore file - excludes files from deployment package
+# This helps reduce Lambda package size and deployment time
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Testing
+tests/
+test_data/
+pytest_cache/
+.pytest_cache/
+*.coverage
+.coverage
+htmlcov/
+.tox/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Documentation
+*.md
+docs/
+ENVIRONMENT_SETUP.md
+README.md
+
+# Configuration files (use environment variables or AWS Secrets Manager instead)
+config.local.env
+config.production.env
+.env
+.env.*
+.active_env
+
+# SAM and AWS
+.aws-sam/
+samconfig.toml
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Local development
+start_api.py
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+Thumbs.db
+desktop.ini
+
+# Package management
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Jupyter Notebooks (if any)
+.ipynb_checkpoints/
+*.ipynb
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# pytest
+pytest.ini
+conftest.py
+

@@ -21,10 +21,10 @@ class ColumnMapper:
             api_key: Google API key (uses Settings.GOOGLE_API_KEY if None)
             model_name: GenAI model name (uses Settings.GENAI_MODEL if None)
         """
-        self.api_key = api_key or Settings.GOOGLE_API_KEY
-        self.model_name = model_name or Settings.GENAI_MODEL
+        self.api_key = api_key if api_key is not None else Settings.GOOGLE_API_KEY
+        self.model_name = model_name if model_name is not None else Settings.GENAI_MODEL
 
-        if not self.api_key:
+        if not self.api_key or not self.api_key.strip():
             raise ValueError(
                 "Google API key is required. Set GOOGLE_API_KEY environment variable."
             )

@@ -10,12 +10,11 @@ from src.services.column_mapper import ColumnMapper
 class TestColumnMapper:
     """Tests for ColumnMapper."""
 
-    def test_init_without_api_key_raises_error(self, monkeypatch):
+    def test_init_without_api_key_raises_error(self):
         """Test that missing API key raises error."""
-        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-
+        # Pass empty string directly instead of relying on environment variable
         with pytest.raises(ValueError, match="Google API key is required"):
-            ColumnMapper()
+            ColumnMapper(api_key="")
 
     def test_init_with_api_key(self, set_test_env_vars):
         """Test initialization with API key."""

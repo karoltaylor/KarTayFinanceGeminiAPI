@@ -859,6 +859,96 @@ Response: 301 Redirect → https://localhost:8000/api/wallets
 
 ---
 
+## AWS Lambda Deployment
+
+This API can be deployed to AWS Lambda using AWS SAM (Serverless Application Model) for automatic scaling and pay-per-use pricing.
+
+### Quick Deployment to AWS
+
+```bash
+# 1. Install AWS SAM CLI
+# See: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
+
+# 2. Build the application
+sam build
+
+# 3. Deploy (first time - guided)
+sam deploy --guided
+
+# 4. Access your API
+# https://your-api-id.execute-api.region.amazonaws.com/production/
+```
+
+### What You Need
+
+1. **AWS Account** - Free tier includes 1M Lambda requests/month
+2. **MongoDB Atlas** - Free tier available (Lambda can't connect to localhost)
+3. **Google API Key** - For AI column mapping
+
+### Deployment Files
+
+- **`lambda_handler.py`** - AWS Lambda entry point with Mangum adapter
+- **`template.yaml`** - SAM CloudFormation template
+- **`samconfig.example.toml`** - Configuration template
+
+### Documentation
+
+- **[QUICKSTART_AWS.md](./QUICKSTART_AWS.md)** - Deploy in 5 minutes
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete deployment guide
+- **[AWS_DEPLOYMENT_SUMMARY.md](./AWS_DEPLOYMENT_SUMMARY.md)** - Architecture and costs
+- **[.aws-sam-commands.md](./.aws-sam-commands.md)** - SAM CLI quick reference
+
+### Benefits of AWS Lambda
+
+✅ **Auto-scaling** - Handles traffic spikes automatically  
+✅ **Pay-per-use** - Only pay for actual requests  
+✅ **No server management** - AWS handles infrastructure  
+✅ **Global deployment** - Deploy to any AWS region  
+✅ **Free tier** - 1M requests/month free forever  
+
+### Cost Estimate
+
+| Traffic | Monthly Cost |
+|---------|--------------|
+| 10K requests/month | ~$0.75 |
+| 100K requests/month | ~$4.35 |
+| 1M requests/month | ~$31.50 |
+
+*Within AWS Free Tier: First 1M requests/month are FREE!*
+
+### Local Testing with SAM
+
+```bash
+# Start local API Gateway
+sam local start-api --env-vars env.json
+
+# Test locally (http://localhost:3000)
+curl http://localhost:3000/health
+```
+
+### Update Deployed API
+
+```bash
+# Make code changes, then:
+sam build && sam deploy
+```
+
+### View Logs
+
+```bash
+sam logs --name FinanceAPIFunction --stack-name kartay-finance-api --tail
+```
+
+### Delete Deployment
+
+```bash
+sam delete --stack-name kartay-finance-api
+```
+
+For detailed instructions, see [QUICKSTART_AWS.md](./QUICKSTART_AWS.md).
+
+---
+
 ## Tech Stack
 
 - **[FastAPI](https://fastapi.tiangolo.com/)** - Modern Python web framework

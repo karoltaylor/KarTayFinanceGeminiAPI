@@ -1,0 +1,77 @@
+name: Python Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - '.github/workflows/python-quality.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+
+jobs:
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pylint black flake8 mypy bandit safety
+
+    - name: Check code formatting with Black
+      run: |
+        black --check --diff api/ src/ tests/
+
+    - name: Lint with PyLint
+      run: |
+        pylint api/ src/ --max-line-length=120 --fail-under=7.0
+
+    - name: Lint with Flake8
+      run: |
+        flake8 api/ src/ --max-line-length=120 --extend-ignore=E203,W503
+
+    - name: Type check with MyPy
+      run: |
+        mypy api/ src/ --ignore-missing-imports --no-strict-optional || true
+
+    - name: Security check with Bandit
+      run: |
+        bandit -r api/ src/ -ll --skip B101,B601
+
+    - name: Check dependencies for vulnerabilities
+      run: |
+        safety check --json || true
+
+    - name: Generate quality report
+      if: always()
+      run: |
+        echo "## Code Quality Report" > quality-report.md
+        echo "" >> quality-report.md
+        echo "✅ Black formatting check completed" >> quality-report.md
+        echo "✅ PyLint analysis completed" >> quality-report.md
+        echo "✅ Flake8 analysis completed" >> quality-report.md
+        echo "✅ Security scan completed" >> quality-report.md
+
+    - name: Upload quality report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: quality-report
+        path: quality-report.md
+

@@ -1,0 +1,82 @@
+[MASTER]
+# Ignore test files, migrations, virtual environments
+ignore=tests,migrations,venv,.venv,env,__pycache__,.pytest_cache
+
+# Use multiple processes to speed up PyLint
+jobs=0
+
+[MESSAGES CONTROL]
+# Disable specific warnings that are too strict or not applicable
+disable=
+    C0111,  # missing-docstring
+    C0103,  # invalid-name (for variables like 'df', 'db', 'id')
+    R0903,  # too-few-public-methods (common with Pydantic models)
+    R0913,  # too-many-arguments (common in FastAPI endpoints)
+    W0212,  # protected-access (for _internal methods)
+    C0415,  # import-outside-toplevel (sometimes needed)
+    W0613,  # unused-argument (common with FastAPI dependencies)
+    R0801,  # duplicate-code (test fixtures often similar)
+    W0511,  # fixme/todo comments
+    R0902,  # too-many-instance-attributes (Pydantic models)
+    R0914,  # too-many-locals
+    C0302,  # too-many-lines (main.py is large API file)
+
+[FORMAT]
+# Maximum number of characters on a single line
+max-line-length=120
+
+# Maximum number of lines in a module
+max-module-lines=1000
+
+[DESIGN]
+# Maximum number of attributes for a class
+max-attributes=15
+
+# Maximum number of locals for function / method body
+max-locals=20
+
+# Maximum number of arguments for function / method
+max-args=10
+
+# Maximum number of public methods for a class
+max-public-methods=25
+
+[BASIC]
+# Good variable names which should always be accepted
+good-names=i,j,k,ex,Run,_,db,id,v,e,f,x,y,df,app
+
+# Regular expression matching correct argument names
+argument-rgx=[a-z_][a-z0-9_]{1,30}$
+
+# Regular expression matching correct variable names
+variable-rgx=[a-z_][a-z0-9_]{1,30}$
+
+[IMPORTS]
+# Allow wildcard imports for FastAPI
+allow-wildcard-with-all=yes
+
+[LOGGING]
+# Format string for logging
+logging-format-style=new
+
+[SIMILARITIES]
+# Minimum lines number of a similarity
+min-similarity-lines=10
+
+# Ignore comments when computing similarities
+ignore-comments=yes
+
+# Ignore docstrings when computing similarities
+ignore-docstrings=yes
+
+# Ignore imports when computing similarities
+ignore-imports=yes
+
+[TYPECHECK]
+# List of module names for which member attributes should not be checked
+ignored-modules=pydantic,fastapi,bson,pymongo
+
+[EXCEPTIONS]
+# Exceptions that will emit a warning when being caught
+overgeneral-exceptions=builtins.BaseException,builtins.Exception
+

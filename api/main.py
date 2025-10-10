@@ -52,30 +52,46 @@ class WalletCreate(BaseModel):
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown."""
     # Startup
+    print("[DEBUG] ========== FastAPI Lifespan Startup ==========")
     try:
         # Show connection info (mask credentials)
+        print("[DEBUG] Retrieving MongoDB configuration...")
         db_url = MongoDBConfig.get_mongodb_url() or "Not set"
-        if "@" in db_url:
-            # Mask the password in the URL
-            parts = db_url.split("@")
-            creds = parts[0].split("://")[1].split(":")
-            masked_url = f"mongodb+srv://{creds[0]}:***@{parts[1]}"
+        
+        if db_url and db_url != "Not set":
+            if "@" in db_url:
+                # Mask the password in the URL
+                parts = db_url.split("@")
+                creds = parts[0].split("://")[1].split(":")
+                masked_url = f"mongodb+srv://{creds[0]}:***@{parts[1]}"
+            else:
+                masked_url = db_url[:30] + "..." if len(db_url) > 30 else db_url
         else:
-            masked_url = db_url
+            masked_url = "NOT SET (will fail)"
         
         print(f"[INFO] Connecting to: {masked_url}")
         print(f"[INFO] Database: {MongoDBConfig.get_mongodb_database()}")
         
+        print("[DEBUG] Calling MongoDBConfig.initialize_collections()...")
         MongoDBConfig.initialize_collections()
         print("[OK] MongoDB connected and initialized")
     except Exception as e:
-        print(f"Warning: MongoDB initialization failed: {e}")
+        print(f"[ERROR] MongoDB initialization failed!")
+        print(f"[ERROR] Exception type: {type(e).__name__}")
+        print(f"[ERROR] Exception message: {str(e)}")
+        import traceback
+        print(f"[ERROR] Traceback:\n{traceback.format_exc()}")
+        print("[WARNING] Continuing without MongoDB connection...")
+    
+    print("[DEBUG] ===============================================")
     
     yield
     
     # Shutdown
+    print("[DEBUG] ========== FastAPI Lifespan Shutdown ==========")
     MongoDBConfig.close_connection()
     print("[OK] MongoDB connection closed")
+    print("[DEBUG] ================================================")
 
 
 # ==============================================================================
@@ -127,6 +143,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "https://localhost:3000",     # HTTPS (dev with SSL)
         "https://localhost:5173",     # HTTPS (dev with SSL)
+        "https://main.d2sw8mgq37patu.amplifyapp.com",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
