@@ -29,9 +29,16 @@ wheels/
 htmlcov/
 .tox/
 coverage.xml
+coverage.json
 coverage.svg
 pytest_cache/
 .mypy_cache/
+
+# Generated Reports
+ci-dashboard.html
+pylint-report.json
+pylint-report.html
+quality-report.md
 
 # Test Data
 test_data/
