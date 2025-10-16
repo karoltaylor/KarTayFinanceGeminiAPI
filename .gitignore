@@ -51,7 +51,13 @@ test_data/
 
 # Environment configuration files with credentials
 config.production.env
+config.dev.env
 config.local.env
+
+# Firebase service account JSON (contains private keys)
+firebase-service-account.json
+firebase-*.json
+*firebase-service-account*.json
 
 # IDE
 .vscode/

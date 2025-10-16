@@ -4,6 +4,7 @@ import pytest
 import pandas as pd
 from pathlib import Path
 import tempfile
+import uuid
 
 
 @pytest.fixture
@@ -11,6 +12,20 @@ def temp_dir():
     """Create a temporary directory for test files."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
+
+
+@pytest.fixture
+def unique_test_email():
+    """Generate a unique test email address."""
+    unique_id = str(uuid.uuid4())[:8]
+    return f"test_{unique_id}@example.com"
+
+
+@pytest.fixture
+def unique_test_username():
+    """Generate a unique test username."""
+    unique_id = str(uuid.uuid4())[:8]
+    return f"testuser_{unique_id}"
 
 
 @pytest.fixture
@@ -81,5 +96,9 @@ def mock_genai_response():
 @pytest.fixture
 def set_test_env_vars(monkeypatch):
     """Set test environment variables."""
+    # Delete existing env vars first to ensure clean test state
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("GENAI_MODEL", raising=False)
+    # Set test values
     monkeypatch.setenv("GOOGLE_API_KEY", "test_api_key_12345")
     monkeypatch.setenv("GENAI_MODEL", "gemini-1.5-flash")

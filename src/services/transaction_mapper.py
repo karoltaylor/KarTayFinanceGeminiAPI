@@ -13,15 +13,17 @@ from ..models import (
     AssetType,
     PyObjectId,
 )
+from .asset_type_mapper import AssetTypeMapper
 
 
 class TransactionMapper:
     """Maps TransactionRecords to MongoDB Transaction models."""
 
-    def __init__(self):
+    def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None):
         """Initialize transaction mapper."""
         self._wallet_cache: Dict[str, PyObjectId] = {}
         self._asset_cache: Dict[str, PyObjectId] = {}
+        self.asset_type_mapper = AssetTypeMapper(api_key=api_key, model_name=model_name)
 
     def _convert_to_numeric(self, series: pd.Series) -> pd.Series:
         """
@@ -125,7 +127,8 @@ class TransactionMapper:
         if "fee" not in df.columns:
             df["fee"] = 0.0
         else:
-            df["fee"] = df["fee"].fillna(0.0)
+            # Convert to numeric first to avoid dtype warnings
+            df["fee"] = pd.to_numeric(df["fee"], errors='coerce').fillna(0.0)
 
         # Ensure currency column exists with default value
         if "currency" not in df.columns:
@@ -155,7 +158,14 @@ class TransactionMapper:
 
         # If collection is provided, try to find in DB
         if wallets_collection is not None:
-            existing = wallets_collection.find_one({"name": wallet_name, "user_id": user_id})
+            # Search with both ObjectId and string user_id to handle type inconsistencies
+            existing = wallets_collection.find_one({
+                "name": wallet_name, 
+                "$or": [
+                    {"user_id": user_id},
+                    {"user_id": str(user_id)}
+                ]
+            })
             if existing:
                 wallet_id = PyObjectId(existing["_id"])
                 self._wallet_cache[cache_key] = wallet_id
@@ -204,8 +214,27 @@ class TransactionMapper:
                 self._asset_cache[cache_key] = asset_id
                 return asset_id
 
-            # Create new asset in DB
-            asset = Asset(asset_name=asset_name, asset_type=asset_type, symbol=symbol)
+            # Create new asset in DB - use AI to infer asset type and symbol
+            ai_result = self.asset_type_mapper.infer_asset_info(asset_name)
+            
+            if ai_result:
+                # Use AI-determined asset type and symbol
+                inferred_asset_type = AssetType(ai_result["asset_type"])
+                inferred_symbol = ai_result["symbol"] if ai_result["symbol"] else symbol
+                asset = Asset(
+                    asset_name=asset_name, 
+                    asset_type=inferred_asset_type, 
+                    symbol=inferred_symbol
+                )
+            else:
+                # Fallback to provided values or OTHER if AI fails
+                fallback_asset_type = asset_type if asset_type != AssetType.OTHER else AssetType.OTHER
+                asset = Asset(
+                    asset_name=asset_name, 
+                    asset_type=fallback_asset_type, 
+                    symbol=symbol
+                )
+            
             result = assets_collection.insert_one(asset.model_dump(by_alias=True))
             asset_id = PyObjectId(result.inserted_id)
             self._asset_cache[cache_key] = asset_id
@@ -225,7 +254,7 @@ class TransactionMapper:
         asset_type: AssetType = AssetType.OTHER,
         wallets_collection=None,
         assets_collection=None,
-    ) -> List[Transaction]:
+    ) -> tuple[List[Transaction], List[dict]]:
         """
         Convert a DataFrame of TransactionRecords to Transaction models.
 
@@ -239,7 +268,7 @@ class TransactionMapper:
             assets_collection: MongoDB assets collection (optional)
 
         Returns:
-            List of Transaction models
+            Tuple of (successful_transactions, error_records)
         """
         # Calculate missing values
         df = self.calculate_missing_values(df)
@@ -248,7 +277,7 @@ class TransactionMapper:
         wallet_id = self.get_or_create_wallet(wallet_name, user_id, wallets_collection)
 
         transactions = []
-        errors = []
+        error_records = []
 
         for idx, row in df.iterrows():
             try:
@@ -273,17 +302,22 @@ class TransactionMapper:
                 transactions.append(transaction)
 
             except Exception as e:
-                errors.append(f"Row {idx}: {str(e)}")
+                error_records.append({
+                    "row_index": int(idx),
+                    "raw_data": row.to_dict(),
+                    "error_message": str(e),
+                    "error_type": type(e).__name__
+                })
                 continue
 
-        if errors:
-            print(f"Warning: {len(errors)} records failed conversion:")
-            for error in errors[:5]:
-                print(f"  - {error}")
-            if len(errors) > 5:
-                print(f"  ... and {len(errors) - 5} more errors")
+        if error_records:
+            print(f"Warning: {len(error_records)} records failed conversion:")
+            for error in error_records[:5]:
+                print(f"  - Row {error['row_index']}: {error['error_message']}")
+            if len(error_records) > 5:
+                print(f"  ... and {len(error_records) - 5} more errors")
 
-        return transactions
+        return transactions, error_records
 
     def transaction_records_to_transactions(
         self,
@@ -358,6 +392,7 @@ class TransactionMapper:
         result = transactions_collection.insert_many(transaction_dicts)
 
         return result.inserted_ids
+
 
     def clear_cache(self):
         """Clear wallet and asset caches."""

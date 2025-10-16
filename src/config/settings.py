@@ -45,6 +45,22 @@ class Settings:
     # Security settings
     ENFORCE_HTTPS: bool = os.getenv("ENFORCE_HTTPS", "false").lower() == "true"
     ALLOWED_HOSTS: list = os.getenv("ALLOWED_HOSTS", "*").split(",")
+    
+    # CORS settings
+    @classmethod
+    def get_cors_origins(cls) -> list:
+        """Get CORS origins from environment variable."""
+        cors_origins = os.getenv("CORS_ORIGINS", "")
+        if not cors_origins:
+            # Default to local development origins if not specified
+            return [
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:5173",
+            ]
+        # Split by comma and strip whitespace
+        return [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
 
     # Table detection settings
     MAX_ROWS_TO_SCAN: int = 50

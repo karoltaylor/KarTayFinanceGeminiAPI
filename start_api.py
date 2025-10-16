@@ -10,7 +10,14 @@ def get_available_environments():
     """Get list of available environment configuration files."""
     env_files = []
     
-    # Check for config.*.env files
+    # Check for config.*.env files in config/ directory
+    config_dir = Path("config")
+    if config_dir.exists():
+        for file in config_dir.glob("config.*.env"):
+            env_name = file.stem.replace("config.", "")
+            env_files.append(env_name)
+    
+    # Also check for config.*.env files in root directory (backward compatibility)
     for file in Path(".").glob("config.*.env"):
         env_name = file.stem.replace("config.", "")
         env_files.append(env_name)
@@ -30,7 +37,12 @@ def get_env_file_path(env_name):
     if env_name == "default":
         return ".env"
     
-    # Try config.{env_name}.env format first
+    # Try config/config.{env_name}.env format first (new location)
+    config_file = f"config/config.{env_name}.env"
+    if Path(config_file).exists():
+        return config_file
+    
+    # Try config.{env_name}.env format (backward compatibility)
     config_file = f"config.{env_name}.env"
     if Path(config_file).exists():
         return config_file
@@ -98,8 +110,8 @@ Examples:
         print("=" * 70)
         print("Starting Financial Transaction API")
         print("=" * 70)
-        print(f"\n🌍 Environment: {args.env}")
-        print(f"📄 Config file: {env_file}")
+        print(f"\nEnvironment: {args.env}")
+        print(f"Config file: {env_file}")
         print(f"\nAPI will be available at:")
         print(f"  - http://localhost:{args.port}")
         print(f"  - API Docs: http://localhost:{args.port}/docs")

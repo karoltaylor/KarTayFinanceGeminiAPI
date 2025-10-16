@@ -77,6 +77,7 @@ class ExcelLoader(BaseFileLoader):
                     skiprows=header_row,
                     header=0,
                     engine="openpyxl" if filepath.suffix == ".xlsx" else "xlrd",
+                    parse_dates=False,  # Disable automatic date parsing
                 )
             else:
                 # If header is at row 0, no need to skip
@@ -85,6 +86,7 @@ class ExcelLoader(BaseFileLoader):
                     sheet_name=0,
                     header=0,
                     engine="openpyxl" if filepath.suffix == ".xlsx" else "xlrd",
+                    parse_dates=False,  # Disable automatic date parsing
                 )
 
             return df
@@ -102,11 +104,13 @@ class ExcelLoader(BaseFileLoader):
 
         try:
             # Read without header to get raw data
+            # Disable automatic date parsing to prevent NaT issues
             df = pd.read_excel(
                 filepath,
                 sheet_name=0,
                 header=None,
                 engine="openpyxl" if filepath.suffix == ".xlsx" else "xlrd",
+                parse_dates=False,  # Disable automatic date parsing
             )
 
             return df

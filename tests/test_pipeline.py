@@ -52,7 +52,7 @@ class TestDataPipeline:
         user_id = ObjectId()
 
         # Process file to transactions
-        transactions = pipeline.process_file_to_transactions(
+        transactions, errors = pipeline.process_file_to_transactions(
             filepath=filepath,
             wallet_name="Test Wallet",
             user_id=user_id,

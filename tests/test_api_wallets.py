@@ -13,7 +13,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture(scope="function")
-def test_db():
+def test_db(unique_test_email, unique_test_username):
     """
     Get test database instance and set up test user.
     
@@ -36,11 +36,11 @@ def test_db():
     db.transactions.delete_many({})  # Clean all test transactions
     db.users.delete_many({"_id": {"$in": [test_user_id, test_user_id_2]}})
     
-    # Create test users (use update with upsert to avoid duplicate key errors)
+    # Create test users with unique emails
     test_user_1 = {
         "_id": test_user_id,
-        "email": "test@example.com",
-        "username": "testuser",
+        "email": unique_test_email,
+        "username": unique_test_username,
         "full_name": "Test User",
         "is_active": True,
         "created_at": datetime.utcnow(),
@@ -48,8 +48,8 @@ def test_db():
     }
     test_user_2 = {
         "_id": test_user_id_2,
-        "email": "test2@example.com",
-        "username": "testuser2",
+        "email": f"test2_{unique_test_email.split('@')[0].split('_')[1]}@example.com",
+        "username": f"{unique_test_username}_2",
         "full_name": "Test User 2",
         "is_active": True,
         "created_at": datetime.utcnow(),
@@ -178,7 +178,7 @@ class TestListWallets:
         """Test that listing wallets without auth header fails."""
         response = client.get("/api/wallets")
         
-        assert response.status_code == 422  # Unprocessable Entity (missing required header)
+        assert response.status_code == 401  # Unauthorized (missing authentication)
 
     def test_list_wallets_invalid_user_id(self, client):
         """Test that invalid user ID in header fails."""
@@ -186,7 +186,7 @@ class TestListWallets:
         response = client.get("/api/wallets", headers=headers)
         
         assert response.status_code == 401
-        assert "Invalid user ID" in response.json()["detail"]
+        assert "Invalid X-User-ID format" in response.json()["detail"]
 
     def test_list_wallets_only_shows_user_wallets(self, client, auth_headers, test_db, test_user_id):
         """Test that users only see their own wallets."""
@@ -292,7 +292,7 @@ class TestCreateWallet:
         wallet_data = {"name": "Unauthorized Wallet"}
         response = client.post("/api/wallets", json=wallet_data)
         
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     def test_create_wallet_strips_whitespace(self, client, auth_headers, test_db):
         """Test that wallet name whitespace is stripped."""
@@ -431,7 +431,7 @@ class TestDeleteWallet:
         
         response = client.delete(f"/api/wallets/{wallet_id}")
         
-        assert response.status_code == 422
+        assert response.status_code == 401
 
 
 class TestWalletEndpointsIntegration:

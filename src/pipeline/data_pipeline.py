@@ -31,7 +31,7 @@ class DataPipeline:
         """
         self.file_loader = FileLoaderFactory()
         self.column_mapper = ColumnMapper(api_key=api_key, model_name=model_name)
-        self.transaction_mapper = TransactionMapper()
+        self.transaction_mapper = TransactionMapper(api_key=api_key, model_name=model_name)
         self.target_columns = Settings.TARGET_COLUMNS
 
     def process_file_to_transactions(
@@ -44,7 +44,7 @@ class DataPipeline:
         default_values: Optional[Dict[str, any]] = None,
         wallets_collection=None,
         assets_collection=None,
-    ) -> List[Transaction]:
+    ) -> tuple[List[Transaction], List[dict]]:
         """
         Process a file and convert to Transaction models.
 
@@ -65,7 +65,7 @@ class DataPipeline:
             assets_collection: MongoDB assets collection (optional)
 
         Returns:
-            List of Transaction models ready for MongoDB insertion
+            Tuple of (successful_transactions, error_records)
         """
         filepath = Path(filepath)
 
@@ -80,8 +80,8 @@ class DataPipeline:
             table_df, column_mapping, default_values
         )
 
-        # Step 4: Convert to Transaction models
-        transactions = self.transaction_mapper.dataframe_to_transactions(
+        # Step 4: Convert to Transaction models (returns transactions and errors)
+        transactions, error_records = self.transaction_mapper.dataframe_to_transactions(
             df=mapped_df,
             wallet_name=wallet_name,
             user_id=user_id,
@@ -91,4 +91,4 @@ class DataPipeline:
             assets_collection=assets_collection,
         )
 
-        return transactions
+        return transactions, error_records

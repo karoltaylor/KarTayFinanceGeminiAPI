@@ -29,6 +29,12 @@ class TransactionRecord(BaseModel):
     @classmethod
     def parse_date(cls, v):
         """Parse various date formats."""
+        # Check for pandas NaT first
+        if hasattr(v, '__class__') and 'pandas' in str(type(v)):
+            if pd.isna(v):
+                raise ValueError(f"Invalid date value: {v}")
+            return v
+            
         if isinstance(v, datetime):
             return v
         if isinstance(v, str):
@@ -47,8 +53,14 @@ class TransactionRecord(BaseModel):
                 except ValueError:
                     continue
             raise ValueError(f"Unable to parse date: {v}")
+        
         if pd.notna(v):
-            return pd.to_datetime(v)
+            parsed_date = pd.to_datetime(v)
+            # Check if pandas returned NaT (Not a Time) for invalid dates
+            if pd.isna(parsed_date):
+                raise ValueError(f"Invalid date value: {v}")
+            return parsed_date
+            
         raise ValueError(f"Invalid date value: {v}")
 
 

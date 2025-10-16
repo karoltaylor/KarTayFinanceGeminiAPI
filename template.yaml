@@ -16,6 +16,7 @@ Parameters:
   MongoDBUrl:
     Type: String
     Description: MongoDB connection URL (e.g., MongoDB Atlas connection string)
+    Default: "mongodb://localhost:27017"
     NoEcho: true
   
   MongoDBDatabase:
@@ -26,6 +27,7 @@ Parameters:
   GoogleApiKey:
     Type: String
     Description: Google Generative AI API Key
+    Default: "your-google-api-key-here"
     NoEcho: true
   
   Environment:

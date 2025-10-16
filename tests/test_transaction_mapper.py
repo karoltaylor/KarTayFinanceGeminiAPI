@@ -3,6 +3,7 @@
 import pytest
 import pandas as pd
 from datetime import datetime
+from unittest.mock import Mock, patch
 
 from src.services.transaction_mapper import TransactionMapper
 from src.models import (
@@ -146,7 +147,7 @@ class TestTransactionMapper:
             }
         )
 
-        transactions = mapper.dataframe_to_transactions(
+        transactions, errors = mapper.dataframe_to_transactions(
             df=df,
             wallet_name="My Wallet",
             user_id=user_id,
@@ -178,7 +179,7 @@ class TestTransactionMapper:
             }
         )
 
-        transactions = mapper.dataframe_to_transactions(
+        transactions, errors = mapper.dataframe_to_transactions(
             df=df, wallet_name="My Wallet", user_id=user_id, transaction_type=TransactionType.BUY
         )
 
@@ -258,8 +259,210 @@ class TestTransactionMapper:
             }
         )
 
-        transactions = mapper.dataframe_to_transactions(df=df, wallet_name="My Wallet", user_id=user_id)
+        transactions, errors = mapper.dataframe_to_transactions(df=df, wallet_name="My Wallet", user_id=user_id)
 
         # Only valid rows should be converted
         assert len(transactions) == 1
         assert transactions[0].volume == 10.0
+
+    @pytest.fixture
+    def mock_asset_type_mapper(self):
+        """Mock AssetTypeMapper for testing."""
+        mock_mapper = Mock()
+        return mock_mapper
+
+    def test_init_with_api_credentials(self, set_test_env_vars):
+        """Test TransactionMapper initialization with API credentials."""
+        mapper = TransactionMapper(api_key="test_key", model_name="test_model")
+        assert mapper.asset_type_mapper is not None
+        assert mapper.asset_type_mapper.api_key == "test_key"
+        assert mapper.asset_type_mapper.model_name == "test_model"
+
+    @patch('src.services.asset_type_mapper.Settings')
+    def test_init_without_api_credentials_uses_settings(self, mock_settings, monkeypatch):
+        """Test TransactionMapper initialization without API credentials uses Settings."""
+        # Mock Settings to return test values
+        mock_settings.GOOGLE_API_KEY = "test_api_key_12345"
+        mock_settings.GENAI_MODEL = "gemini-1.5-flash"
+        
+        mapper = TransactionMapper()
+        assert mapper.asset_type_mapper is not None
+        assert mapper.asset_type_mapper.api_key == "test_api_key_12345"
+        assert mapper.asset_type_mapper.model_name == "gemini-1.5-flash"
+
+    @patch('src.services.transaction_mapper.AssetTypeMapper')
+    def test_get_or_create_asset_with_ai_inference_success(self, mock_asset_type_mapper_class, set_test_env_vars):
+        """Test asset creation with successful AI inference."""
+        # Setup mock
+        mock_mapper = Mock()
+        mock_mapper.infer_asset_info.return_value = {"asset_type": "stock", "symbol": "AAPL"}
+        mock_asset_type_mapper_class.return_value = mock_mapper
+        
+        mapper = TransactionMapper()
+        mapper.asset_type_mapper = mock_mapper
+        
+        # Mock assets collection
+        mock_collection = Mock()
+        mock_collection.find_one.return_value = None  # Asset doesn't exist
+        mock_collection.insert_one.return_value.inserted_id = ObjectId()
+        
+        asset_id = mapper.get_or_create_asset(
+            asset_name="Apple Inc.",
+            asset_type=AssetType.OTHER,  # Will be overridden by AI
+            assets_collection=mock_collection
+        )
+        
+        # Verify AI was called
+        mock_mapper.infer_asset_info.assert_called_once_with("Apple Inc.")
+        
+        # Verify asset was created with AI-determined values
+        mock_collection.insert_one.assert_called_once()
+        created_asset = mock_collection.insert_one.call_args[0][0]
+        assert created_asset["asset_name"] == "Apple Inc."
+        assert created_asset["asset_type"] == "stock"
+        assert created_asset["symbol"] == "AAPL"
+        
+        assert asset_id is not None
+
+    @patch('src.services.transaction_mapper.AssetTypeMapper')
+    def test_get_or_create_asset_with_ai_inference_failure(self, mock_asset_type_mapper_class, set_test_env_vars):
+        """Test asset creation with AI inference failure falls back to provided values."""
+        # Setup mock
+        mock_mapper = Mock()
+        mock_mapper.infer_asset_info.return_value = None  # AI fails
+        mock_asset_type_mapper_class.return_value = mock_mapper
+        
+        mapper = TransactionMapper()
+        mapper.asset_type_mapper = mock_mapper
+        
+        # Mock assets collection
+        mock_collection = Mock()
+        mock_collection.find_one.return_value = None  # Asset doesn't exist
+        mock_collection.insert_one.return_value.inserted_id = ObjectId()
+        
+        asset_id = mapper.get_or_create_asset(
+            asset_name="Unknown Asset",
+            asset_type=AssetType.OTHER,
+            symbol="UNKNOWN",
+            assets_collection=mock_collection
+        )
+        
+        # Verify AI was called
+        mock_mapper.infer_asset_info.assert_called_once_with("Unknown Asset")
+        
+        # Verify asset was created with fallback values
+        mock_collection.insert_one.assert_called_once()
+        created_asset = mock_collection.insert_one.call_args[0][0]
+        assert created_asset["asset_name"] == "Unknown Asset"
+        assert created_asset["asset_type"] == "other"  # Fallback to OTHER
+        assert created_asset["symbol"] == "UNKNOWN"
+        
+        assert asset_id is not None
+
+    @patch('src.services.transaction_mapper.AssetTypeMapper')
+    def test_get_or_create_asset_existing_asset_skips_ai(self, mock_asset_type_mapper_class, set_test_env_vars):
+        """Test that existing assets skip AI inference."""
+        # Setup mock
+        mock_mapper = Mock()
+        mock_asset_type_mapper_class.return_value = mock_mapper
+        
+        mapper = TransactionMapper()
+        mapper.asset_type_mapper = mock_mapper
+        
+        # Mock assets collection - asset already exists
+        existing_asset = {"_id": ObjectId(), "asset_name": "Apple Inc.", "asset_type": "stock"}
+        mock_collection = Mock()
+        mock_collection.find_one.return_value = existing_asset
+        
+        asset_id = mapper.get_or_create_asset(
+            asset_name="Apple Inc.",
+            asset_type=AssetType.OTHER,
+            assets_collection=mock_collection
+        )
+        
+        # Verify AI was NOT called for existing asset
+        mock_mapper.infer_asset_info.assert_not_called()
+        
+        # Verify asset was not inserted (already exists)
+        mock_collection.insert_one.assert_not_called()
+        
+        assert asset_id == PyObjectId(existing_asset["_id"])
+
+    @patch('src.services.transaction_mapper.AssetTypeMapper')
+    def test_get_or_create_asset_cached_asset_skips_ai(self, mock_asset_type_mapper_class, set_test_env_vars):
+        """Test that cached assets skip AI inference."""
+        # Setup mock
+        mock_mapper = Mock()
+        mock_asset_type_mapper_class.return_value = mock_mapper
+        
+        mapper = TransactionMapper()
+        mapper.asset_type_mapper = mock_mapper
+        
+        # Pre-populate cache
+        cached_asset_id = PyObjectId()
+        cache_key = "Apple Inc.:other"
+        mapper._asset_cache[cache_key] = cached_asset_id
+        
+        asset_id = mapper.get_or_create_asset(
+            asset_name="Apple Inc.",
+            asset_type=AssetType.OTHER
+        )
+        
+        # Verify AI was NOT called for cached asset
+        mock_mapper.infer_asset_info.assert_not_called()
+        
+        assert asset_id == cached_asset_id
+
+    @patch('src.services.transaction_mapper.AssetTypeMapper')
+    def test_get_or_create_asset_ai_provides_symbol(self, mock_asset_type_mapper_class, set_test_env_vars):
+        """Test that AI-provided symbol is used when available."""
+        # Setup mock
+        mock_mapper = Mock()
+        mock_mapper.infer_asset_info.return_value = {"asset_type": "cryptocurrency", "symbol": "BTC"}
+        mock_asset_type_mapper_class.return_value = mock_mapper
+        
+        mapper = TransactionMapper()
+        mapper.asset_type_mapper = mock_mapper
+        
+        # Mock assets collection
+        mock_collection = Mock()
+        mock_collection.find_one.return_value = None  # Asset doesn't exist
+        mock_collection.insert_one.return_value.inserted_id = ObjectId()
+        
+        asset_id = mapper.get_or_create_asset(
+            asset_name="Bitcoin",
+            asset_type=AssetType.OTHER,
+            symbol="UNKNOWN",  # Should be overridden by AI
+            assets_collection=mock_collection
+        )
+        
+        # Verify asset was created with AI-provided symbol
+        created_asset = mock_collection.insert_one.call_args[0][0]
+        assert created_asset["symbol"] == "BTC"
+
+    @patch('src.services.transaction_mapper.AssetTypeMapper')
+    def test_get_or_create_asset_ai_empty_symbol_uses_provided(self, mock_asset_type_mapper_class, set_test_env_vars):
+        """Test that when AI returns empty symbol, provided symbol is used."""
+        # Setup mock
+        mock_mapper = Mock()
+        mock_mapper.infer_asset_info.return_value = {"asset_type": "bond", "symbol": ""}
+        mock_asset_type_mapper_class.return_value = mock_mapper
+        
+        mapper = TransactionMapper()
+        mapper.asset_type_mapper = mock_mapper
+        
+        # Mock assets collection
+        mock_collection = Mock()
+        mock_collection.find_one.return_value = None  # Asset doesn't exist
+        mock_collection.insert_one.return_value.inserted_id = ObjectId()
+        
+        asset_id = mapper.get_or_create_asset(
+            asset_name="US Treasury Bond",
+            asset_type=AssetType.OTHER,
+            symbol="TREASURY",
+            assets_collection=mock_collection
+        )
+        
+        # Verify asset was created with provided symbol (AI returned empty)
+        created_asset = mock_collection.insert_one.call_args[0][0]
+        assert created_asset["symbol"] == "TREASURY"

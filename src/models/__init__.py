@@ -8,6 +8,7 @@ from .mongodb_models import (
     AssetCurrentValue,
     Transaction,
     TransactionType,
+    TransactionError,
     PyObjectId,
 )
 
@@ -20,5 +21,6 @@ __all__ = [
     "AssetCurrentValue",
     "Transaction",
     "TransactionType",
+    "TransactionError",
     "PyObjectId",
 ]

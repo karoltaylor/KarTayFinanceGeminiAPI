@@ -22,7 +22,13 @@ from src.models import TransactionType, AssetType
 from src.models.mongodb_models import Wallet, User
 from src.config.mongodb import MongoDBConfig, get_db
 from src.config.settings import Settings
+from src.utils.logger import logger
+from src.middleware.logging_middleware import LoggingMiddleware
 from pymongo.database import Database
+from src.auth.firebase_auth import get_current_user_from_token
+
+# Import logging router
+from api import logs
 
 
 # ==============================================================================
@@ -98,27 +104,36 @@ async def lifespan(app: FastAPI):
 # DEPENDENCIES
 # ==============================================================================
 
-def get_current_user(
-    user_id: Annotated[str, Header(
-        alias="X-User-ID",
-        description="User ID obtained from OAuth login/registration"
-    )],
+async def get_current_user(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
     db: Database = Depends(get_db)
 ) -> ObjectId:
     """
-    Get current user from X-User-ID header.
+    Get current user from Firebase token OR X-User-ID header (backward compatible).
     
-    The user_id is obtained after OAuth authentication via /api/users/register endpoint.
-    For production, replace this with JWT token authentication.
+    **Preferred Method (Secure):**
+    Send Firebase ID token in Authorization header:
+    ```
+    Authorization: Bearer <firebase_id_token>
+    ```
+    
+    **Legacy Method (Backward Compatible):**
+    Send X-User-ID header:
+    ```
+    X-User-ID: <user_id>
+    ```
+    
+    The Firebase token is verified and user is auto-registered on first use.
+    X-User-ID is supported for backward compatibility during migration.
     """
-    try:
-        user_obj_id = ObjectId(user_id)
-        user = db.users.find_one({"_id": user_obj_id, "is_active": True})
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found or inactive")
-        return user_obj_id
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid user ID: {str(e)}")
+    from src.auth.firebase_auth import verify_firebase_token, get_current_user_from_token
+    
+    # Verify Firebase token (if provided)
+    firebase_user = await verify_firebase_token(authorization)
+    
+    # Get user from token or X-User-ID
+    return await get_current_user_from_token(firebase_user, x_user_id, db)
 
 
 # ==============================================================================
@@ -132,19 +147,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware - allow frontend connections
+# CORS middleware - environment-specific allowed origins
+cors_origins = Settings.get_cors_origins()
+print(f"[INFO] CORS allowed origins: {', '.join(cors_origins)}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",      # React default (dev)
-        "http://localhost:5173",      # Vite default (dev)
-        "http://localhost:4200",      # Angular default (dev)
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "https://localhost:3000",     # HTTPS (dev with SSL)
-        "https://localhost:5173",     # HTTPS (dev with SSL)
-        "https://main.d2sw8mgq37patu.amplifyapp.com",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
@@ -161,6 +170,13 @@ if Settings.ALLOWED_HOSTS != ["*"]:
         TrustedHostMiddleware,
         allowed_hosts=Settings.ALLOWED_HOSTS
     )
+
+# Logging middleware - log all requests and responses
+app.add_middleware(
+    LoggingMiddleware,
+    log_requests=True,
+    log_responses=True
+)
 
 
 # HTTPS Enforcement Middleware
@@ -193,6 +209,14 @@ async def enforce_https(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     
     return response
+
+
+# ==============================================================================
+# ROUTERS
+# ==============================================================================
+
+# Include logging router
+app.include_router(logs.router)
 
 
 # ==============================================================================
@@ -374,9 +398,9 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
         raise HTTPException(status_code=500, detail=f"Error registering user: {str(e)}")
 
 
-@app.get("/api/users/me", summary="Get current user info", tags=["Authentication"])
+@app.get("/api/users/me", summary="Get current user info", tags=["Authentication"], response_model=None)
 async def get_current_user_info(
-    user_id: ObjectId = Depends(get_current_user),
+    user_id: ObjectId = Depends(get_current_user_from_token),
     db: Database = Depends(get_db)
 ):
     """
@@ -423,11 +447,11 @@ async def get_current_user_info(
 # WALLET ENDPOINTS
 # ==============================================================================
 
-@app.get("/api/wallets", summary="List user's wallets", tags=["Wallets"])
+@app.get("/api/wallets", summary="List user's wallets", tags=["Wallets"], response_model=None)
 async def list_wallets(
     limit: Annotated[int, Query(description="Maximum number of wallets to return", ge=1, le=1000)] = 100,
     skip: Annotated[int, Query(description="Number of wallets to skip", ge=0)] = 0,
-    user_id: ObjectId = Depends(get_current_user),
+    user_id: ObjectId = Depends(get_current_user_from_token),
     db: Database = Depends(get_db)
 ):
     """
@@ -463,10 +487,10 @@ async def list_wallets(
     return {"wallets": wallets, "count": len(wallets)}
 
 
-@app.post("/api/wallets", summary="Create a wallet", tags=["Wallets"])
+@app.post("/api/wallets", summary="Create a wallet", tags=["Wallets"], response_model=None)
 async def create_wallet(
     wallet_data: WalletCreate,
-    user_id: ObjectId = Depends(get_current_user),
+    user_id: ObjectId = Depends(get_current_user_from_token),
     db: Database = Depends(get_db)
 ):
     """
@@ -525,10 +549,10 @@ async def create_wallet(
         raise HTTPException(status_code=500, detail=f"Error creating wallet: {str(e)}")
 
 
-@app.delete("/api/wallets/{wallet_id}", summary="Delete a wallet", tags=["Wallets"])
+@app.delete("/api/wallets/{wallet_id}", summary="Delete a wallet", tags=["Wallets"], response_model=None)
 async def delete_wallet(
     wallet_id: Annotated[str, PathParam(description="Wallet ID to delete")],
-    user_id: ObjectId = Depends(get_current_user),
+    user_id: ObjectId = Depends(get_current_user_from_token),
     db: Database = Depends(get_db)
 ):
     """
@@ -630,7 +654,7 @@ async def list_assets(
 # TRANSACTION ENDPOINTS
 # ==============================================================================
 
-@app.post("/api/transactions/upload", summary="Upload transaction file", tags=["Transactions"])
+@app.post("/api/transactions/upload", summary="Upload transaction file", tags=["Transactions"], response_model=None)
 async def upload_transactions(
     file: UploadFile = File(..., description="Transaction file (CSV, TXT, XLS, XLSX)"),
     wallet_name: str = Form(..., description="Name of the wallet (creates if doesn't exist)"),
@@ -638,7 +662,7 @@ async def upload_transactions(
         TransactionType.BUY, description="Type of transactions (buy, sell, etc.)"
     ),
     asset_type: AssetType = Form(AssetType.STOCK, description="Type of assets (stock, crypto, etc.)"),
-    user_id: ObjectId = Depends(get_current_user),
+    user_id: ObjectId = Depends(get_current_user_from_token),
     db: Database = Depends(get_db),
 ):
     """
@@ -666,10 +690,13 @@ async def upload_transactions(
     - `asset_type`: Type of assets (default: stock)
     
     **Returns:**
-    - Processing status
-    - Total transactions saved
+    - Processing status and summary statistics
+    - **Complete list of all transactions** with all columns:
+        - Transaction ID, wallet name, asset name
+        - Date, type, volume, item price
+        - Transaction amount, currency, fee
+        - Asset type and notes
     - Number of wallets/assets created
-    - Sample of transaction IDs
     - Processing timestamp
     
     **Errors:**
@@ -678,6 +705,21 @@ async def upload_transactions(
     - 422: No valid transactions in file
     - 500: Processing error
     """
+    # Log transaction upload start
+    logger.info(
+        "transaction_upload",
+        "Transaction upload started",
+        user_id=str(user_id),
+        context={
+            "wallet_name": wallet_name,
+            "transaction_type": transaction_type.value,
+            "asset_type": asset_type.value,
+            "filename": file.filename,
+            "content_type": file.content_type,
+            "file_size": file.size if hasattr(file, 'size') else 'unknown'
+        }
+    )
+    
     temp_file = None
 
     try:
@@ -701,8 +743,8 @@ async def upload_transactions(
         # Initialize pipeline
         pipeline = DataPipeline()
 
-        # Process file to Transaction models
-        transactions = pipeline.process_file_to_transactions(
+        # Process file to Transaction models (returns transactions and errors)
+        transactions, error_records = pipeline.process_file_to_transactions(
             filepath=temp_filepath,
             wallet_name=wallet_name,
             user_id=user_id,
@@ -712,46 +754,127 @@ async def upload_transactions(
             assets_collection=db.assets,
         )
 
-        if not transactions:
+        # Insert successful transactions into MongoDB
+        inserted_count = 0
+        if transactions:
+            transaction_dicts = [t.model_dump(by_alias=True) for t in transactions]
+            result = db.transactions.insert_many(transaction_dicts)
+            inserted_count = len(result.inserted_ids)
+
+        # Insert error records into transaction_errors collection
+        errors_count = 0
+        if error_records:
+            from src.models.mongodb_models import TransactionError
+            
+            error_docs = []
+            for error_rec in error_records:
+                error_doc = TransactionError(
+                    user_id=user_id,
+                    wallet_name=wallet_name,
+                    filename=file.filename,
+                    row_index=error_rec["row_index"],
+                    raw_data=error_rec["raw_data"],
+                    error_message=error_rec["error_message"],
+                    error_type=error_rec["error_type"],
+                    transaction_type=transaction_type.value,
+                    asset_type=asset_type.value
+                )
+                error_docs.append(error_doc.model_dump(by_alias=True))
+            
+            db.transaction_errors.insert_many(error_docs)
+            errors_count = len(error_docs)
+
+        # Check if we have any successful transactions
+        if inserted_count == 0 and errors_count == 0:
             raise HTTPException(
                 status_code=422,
                 detail="No valid transactions could be created from the file. "
                 "Check file format and data quality.",
             )
 
-        # Insert transactions into MongoDB
-        transaction_dicts = [t.model_dump(by_alias=True) for t in transactions]
-        result = db.transactions.insert_many(transaction_dicts)
-
         # Get statistics
-        inserted_count = len(result.inserted_ids)
         wallet_count = len(pipeline.transaction_mapper._wallet_cache)
         asset_count = len(pipeline.transaction_mapper._asset_cache)
 
+        # Log transaction upload results
+        logger.info(
+            "transaction_upload",
+            "Transaction upload completed",
+            user_id=str(user_id),
+            context={
+                "wallet_name": wallet_name,
+                "filename": file.filename,
+                "successful_transactions": inserted_count,
+                "failed_transactions": errors_count,
+                "wallets_created": wallet_count,
+                "assets_created": asset_count,
+                "transaction_type": transaction_type.value,
+                "asset_type": asset_type.value
+            }
+        )
+
+        # Fetch full transaction details with asset and wallet names
+        transaction_details = []
+        if transactions and inserted_count > 0:
+            for transaction, inserted_id in zip(transactions, result.inserted_ids):
+                # Get asset details
+                asset = db.assets.find_one({"_id": transaction.asset_id})
+                # Get wallet details
+                wallet = db.wallets.find_one({"_id": transaction.wallet_id})
+                
+                transaction_details.append({
+                    "id": str(inserted_id),
+                    "wallet_id": str(transaction.wallet_id),
+                    "wallet_name": wallet["name"] if wallet else "Unknown",
+                    "asset_id": str(transaction.asset_id),
+                    "asset_name": asset["asset_name"] if asset else "Unknown",
+                    "asset_type": asset["asset_type"] if asset else "unknown",
+                    "date": transaction.date.isoformat(),
+                    "transaction_type": transaction.transaction_type.value,
+                    "volume": transaction.volume,
+                    "item_price": transaction.item_price,
+                    "transaction_amount": transaction.transaction_amount,
+                    "currency": transaction.currency,
+                    "fee": transaction.fee,
+                    "notes": transaction.notes,
+                    "created_at": transaction.created_at.isoformat(),
+                })
+
         return {
-            "status": "success",
-            "message": f"Successfully processed {inserted_count} transactions",
+            "status": "success" if inserted_count > 0 else "partial_failure",
+            "message": f"Processed {inserted_count} transactions successfully, {errors_count} failed",
             "data": {
                 "filename": file.filename,
                 "wallet_name": wallet_name,
                 "transaction_type": transaction_type.value,
                 "asset_type": asset_type.value,
-                "total_transactions": inserted_count,
-                "wallets_created": wallet_count,
-                "assets_created": asset_count,
-                "inserted_ids": [str(id) for id in result.inserted_ids[:10]],
-                "more_ids": (
-                    len(result.inserted_ids) - 10
-                    if len(result.inserted_ids) > 10
-                    else 0
-                ),
-                "processed_at": datetime.utcnow().isoformat(),
+                "summary": {
+                    "total_transactions": inserted_count,
+                    "failed_transactions": errors_count,
+                    "wallets_created": wallet_count,
+                    "assets_created": asset_count,
+                    "processed_at": datetime.utcnow().isoformat(),
+                },
+                "transactions": transaction_details,
             },
         }
 
     except HTTPException:
         raise
     except Exception as e:
+        # Log transaction upload error
+        logger.error(
+            "transaction_upload",
+            "Transaction upload failed",
+            user_id=str(user_id),
+            context={
+                "wallet_name": wallet_name,
+                "filename": file.filename,
+                "transaction_type": transaction_type.value,
+                "asset_type": asset_type.value
+            },
+            error=e
+        )
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
     finally:
         # Clean up temporary file
@@ -759,69 +882,234 @@ async def upload_transactions(
             os.unlink(temp_filepath)
 
 
-@app.get("/api/transactions", summary="List transactions", tags=["Transactions"])
+@app.get("/api/transactions", summary="List transactions", tags=["Transactions"], response_model=None)
 async def list_transactions(
-    wallet_name: Annotated[Optional[str], Query(description="Filter by wallet name")] = None,
+    wallet_id: Annotated[str, Query(description="Filter by wallet ID")],
     limit: Annotated[int, Query(description="Maximum number of transactions to return", ge=1, le=1000)] = 100,
     skip: Annotated[int, Query(description="Number of transactions to skip", ge=0)] = 0,
-    user_id: ObjectId = Depends(get_current_user),
+    db: Database = Depends(get_db),
+    user_id: ObjectId = Depends(get_current_user_from_token),
+):
+    """
+    List transactions for a specific wallet with pagination support.
+    
+    **Authentication Required:** Include `X-User-ID` header with your user ID.
+    
+    **Query Parameters:**
+    - `wallet_id`: Wallet ID to filter transactions (required)
+    - `limit`: Maximum number of transactions to return (default: 100, max: 1000)
+    - `skip`: Number of transactions to skip for pagination (default: 0)
+    
+    **Returns:**
+    - `transactions`: List of transactions from the specified wallet
+    - `count`: Number of transactions in current page
+    - `total_count`: Total number of transactions in the wallet
+    - `total_pages`: Total number of pages available
+    - `page`: Current page number (1-based)
+    - `limit`: Number of transactions per page
+    - `skip`: Number of transactions skipped
+    - `has_next`: Whether there are more pages after current page
+    - `has_prev`: Whether there are pages before current page
+    
+    **Errors:**
+    - 401: Invalid or missing X-User-ID header
+    - 422: Missing required wallet_id parameter
+    """
+    # Verify wallet belongs to user
+    try:
+        wallet_object_id = ObjectId(wallet_id)
+    except Exception:
+        return {"transactions": [], "count": 0, "message": "Invalid wallet ID format"}
+    
+    wallet = db.wallets.find_one({
+        "_id": wallet_object_id,
+        "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]
+    })
+    if wallet:
+        # Include both ObjectId and string versions to handle data type mismatches
+        query = {"wallet_id": {"$in": [wallet_object_id, wallet_id]}}
+    else:
+        return {"transactions": [], "count": 0, "message": "Wallet not found or not owned by user"}
+
+    # Get total count for pagination
+    total_count = db.transactions.count_documents(query)
+    
+    # Get transactions with pagination
+    transactions = list(db.transactions.find(query).skip(skip).limit(limit))
+
+    # Fetch asset and wallet details for all transactions
+    asset_ids = set()
+    wallet_ids = set()
+    for trans in transactions:
+        asset_ids.add(trans["asset_id"])
+        wallet_ids.add(trans["wallet_id"])
+    
+    # Fetch all assets and wallets in bulk
+    assets = {}
+    if asset_ids:
+        # Convert asset IDs to ObjectIds for lookup
+        asset_object_ids = []
+        asset_string_ids = []
+        for asset_id in asset_ids:
+            try:
+                asset_object_ids.append(ObjectId(asset_id))
+                asset_string_ids.append(str(asset_id))
+            except:
+                asset_string_ids.append(str(asset_id))
+        
+        # Query with both ObjectId and string versions
+        asset_cursor = db.assets.find({
+            "$or": [
+                {"_id": {"$in": asset_object_ids}},
+                {"_id": {"$in": asset_string_ids}}
+            ]
+        })
+        for asset in asset_cursor:
+            assets[str(asset["_id"])] = {
+                "name": asset["asset_name"],
+                "type": asset["asset_type"] if hasattr(asset["asset_type"], 'value') else str(asset["asset_type"]),
+                "symbol": asset.get("symbol", "")
+            }
+    
+    wallets = {}
+    if wallet_ids:
+        # Convert wallet IDs to ObjectIds for lookup
+        wallet_object_ids = []
+        wallet_string_ids = []
+        for wallet_id in wallet_ids:
+            try:
+                wallet_object_ids.append(ObjectId(wallet_id))
+                wallet_string_ids.append(str(wallet_id))
+            except:
+                wallet_string_ids.append(str(wallet_id))
+        
+        # Query with both ObjectId and string versions
+        wallet_cursor = db.wallets.find({
+            "$or": [
+                {"_id": {"$in": wallet_object_ids}},
+                {"_id": {"$in": wallet_string_ids}}
+            ]
+        })
+        for wallet in wallet_cursor:
+            wallets[str(wallet["_id"])] = {
+                "name": wallet["name"]
+            }
+
+    # Enhance transactions with asset and wallet details
+    enhanced_transactions = []
+    for trans in transactions:
+        asset_id = str(trans["asset_id"])
+        wallet_id = str(trans["wallet_id"])
+        
+        # Get asset and wallet details
+        asset_details = assets.get(asset_id, {"name": "Unknown", "type": "unknown", "symbol": ""})
+        wallet_details = wallets.get(wallet_id, {"name": "Unknown"})
+        
+        # Create enhanced transaction record
+        enhanced_trans = {
+            "_id": str(trans["_id"]),
+            "wallet_id": wallet_id,
+            "wallet_name": wallet_details["name"],
+            "asset_id": asset_id,
+            "asset_name": asset_details["name"],
+            "asset_type": asset_details["type"],
+            "asset_symbol": asset_details["symbol"],
+            "date": trans["date"].isoformat() if hasattr(trans["date"], 'isoformat') else str(trans["date"]),
+            "transaction_type": trans["transaction_type"].value if hasattr(trans["transaction_type"], 'value') else str(trans["transaction_type"]),
+            "volume": trans["volume"],
+            "item_price": trans["item_price"],
+            "transaction_amount": trans["transaction_amount"],
+            "currency": trans["currency"],
+            "fee": trans["fee"],
+            "notes": trans.get("notes"),
+            "created_at": trans["created_at"].isoformat() if hasattr(trans["created_at"], 'isoformat') else str(trans["created_at"]),
+            "updated_at": trans["updated_at"].isoformat() if hasattr(trans["updated_at"], 'isoformat') else str(trans["updated_at"])
+        }
+        enhanced_transactions.append(enhanced_trans)
+
+    # Convert ObjectIds in filter to strings for JSON serialization
+    serializable_filter = {}
+    for key, value in query.items():
+        if key == "wallet_id" and isinstance(value, dict) and "$in" in value:
+            # Convert ObjectId list to string list
+            serializable_filter[key] = {"$in": [str(oid) for oid in value["$in"]]}
+        elif hasattr(value, '__class__') and value.__class__.__name__ == 'ObjectId':
+            serializable_filter[key] = str(value)
+        else:
+            serializable_filter[key] = value
+    
+    # Calculate pagination metadata
+    current_page = (skip // limit) + 1
+    total_pages = (total_count + limit - 1) // limit  # Ceiling division
+    has_next = skip + limit < total_count
+    has_prev = skip > 0
+    
+    return {
+        "transactions": enhanced_transactions,
+        "count": len(enhanced_transactions),
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "page": current_page,
+        "limit": limit,
+        "skip": skip,
+        "has_next": has_next,
+        "has_prev": has_prev
+    }
+
+
+@app.get("/api/transactions/errors", summary="List transaction errors", tags=["Transactions"], response_model=None)
+async def list_transaction_errors(
+    wallet_name: Annotated[Optional[str], Query(description="Filter by wallet name")] = None,
+    resolved: Annotated[Optional[bool], Query(description="Filter by resolved status")] = None,
+    limit: Annotated[int, Query(description="Maximum errors to return", ge=1, le=1000)] = 100,
+    skip: Annotated[int, Query(description="Number of errors to skip", ge=0)] = 0,
+    user_id: ObjectId = Depends(get_current_user_from_token),
     db: Database = Depends(get_db),
 ):
     """
-    List transactions for the authenticated user's wallets.
+    List transaction errors for manual correction.
     
     **Authentication Required:** Include `X-User-ID` header with your user ID.
     
     **Query Parameters:**
     - `wallet_name`: Filter by specific wallet name (optional)
-    - `limit`: Maximum number of transactions to return (default: 100, max: 1000)
-    - `skip`: Number of transactions to skip for pagination (default: 0)
+    - `resolved`: Filter by resolved status (optional)
+    - `limit`: Maximum number of errors to return (default: 100, max: 1000)
+    - `skip`: Number of errors to skip for pagination (default: 0)
     
     **Returns:**
-    - List of transactions from user's wallets
-    - Total count of transactions returned
-    - Applied filter
+    - List of transaction errors with details
+    - Total count of errors returned
+    - Each error includes: row index, raw data, error message, error type
     
     **Errors:**
     - 401: Invalid or missing X-User-ID header
     """
-    query = {}
-
-    # If wallet_name provided, find wallet_id first (must belong to user)
+    query = {"user_id": user_id}
+    
     if wallet_name:
-        wallet = db.wallets.find_one({
-            "name": wallet_name,
-            "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]
-        })
-        if wallet:
-            query["wallet_id"] = wallet["_id"]
-        else:
-            return {"transactions": [], "count": 0, "message": "Wallet not found or not owned by user"}
-    else:
-        # Get all wallet IDs for this user
-        user_wallets = list(db.wallets.find({
-            "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]
-        }, {"_id": 1}))
-        wallet_ids = [w["_id"] for w in user_wallets]
-        query["wallet_id"] = {"$in": wallet_ids}
-
-    transactions = list(db.transactions.find(query).skip(skip).limit(limit))
-
-    # Convert ObjectId to string and transaction_type enum
-    for trans in transactions:
-        trans["_id"] = str(trans["_id"])
-        trans["wallet_id"] = str(trans["wallet_id"])
-        trans["asset_id"] = str(trans["asset_id"])
-        if "transaction_type" in trans:
-            trans["transaction_type"] = trans["transaction_type"].value
-
-    return {"transactions": transactions, "count": len(transactions), "filter": query}
+        query["wallet_name"] = wallet_name
+    if resolved is not None:
+        query["resolved"] = resolved
+    
+    errors = list(db.transaction_errors.find(query).sort("created_at", -1).skip(skip).limit(limit))
+    
+    # Convert ObjectIds to strings
+    for error in errors:
+        error["_id"] = str(error["_id"])
+        error["user_id"] = str(error["user_id"])
+    
+    return {
+        "status": "success",
+        "count": len(errors),
+        "errors": errors
+    }
 
 
-@app.delete("/api/transactions/wallet/{wallet_name}", summary="Delete wallet transactions", tags=["Transactions"])
+@app.delete("/api/transactions/wallet/{wallet_name}", summary="Delete wallet transactions", tags=["Transactions"], response_model=None)
 async def delete_wallet_transactions(
     wallet_name: Annotated[str, PathParam(description="Name of the wallet")],
-    user_id: ObjectId = Depends(get_current_user),
+    user_id: ObjectId = Depends(get_current_user_from_token),
     db: Database = Depends(get_db)
 ):
     """
@@ -863,9 +1151,9 @@ async def delete_wallet_transactions(
 # STATISTICS ENDPOINTS
 # ==============================================================================
 
-@app.get("/api/stats", summary="Get user statistics", tags=["Statistics"])
+@app.get("/api/stats", summary="Get user statistics", tags=["Statistics"], response_model=None)
 async def get_statistics(
-    user_id: ObjectId = Depends(get_current_user),
+    user_id: ObjectId = Depends(get_current_user_from_token),
     db: Database = Depends(get_db)
 ):
     """

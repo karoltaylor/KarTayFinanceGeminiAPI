@@ -1,6 +1,6 @@
 """MongoDB data models for financial tracking system."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, ConfigDict
@@ -40,6 +40,8 @@ class AssetType(str, Enum):
 
     BOND = "bond"
     STOCK = "stock"
+    ETF = "etf"
+    MANAGED_MUTUAL_FUND = "managed mutual fund"
     REAL_ESTATE = "real_estate"
     CRYPTOCURRENCY = "cryptocurrency"
     COMMODITY = "commodity"
@@ -85,8 +87,53 @@ class User(BaseModel):
     def validate_email(cls, v: str) -> str:
         """Validate email format."""
         v = v.strip().lower()
-        if "@" not in v or "." not in v.split("@")[1]:
+        
+        # Basic email validation
+        if not v:
+            raise ValueError("Email cannot be empty")
+        
+        if "@" not in v:
+            raise ValueError("Email must contain @")
+        
+        parts = v.split("@")
+        if len(parts) != 2:
+            raise ValueError("Email must have exactly one @")
+        
+        local, domain = parts
+        
+        if not local:
+            raise ValueError("Email local part cannot be empty")
+        
+        if not domain:
+            raise ValueError("Email domain cannot be empty")
+        
+        if "." not in domain:
+            raise ValueError("Email domain must contain a dot")
+        
+        # Check for common invalid patterns
+        if v.startswith("@") or v.endswith("@"):
             raise ValueError("Invalid email format")
+        
+        if v.startswith(".") or v.endswith("."):
+            raise ValueError("Invalid email format")
+        
+        if ".." in v:
+            raise ValueError("Invalid email format")
+        
+        # Additional strict validation
+        if domain.startswith(".") or domain.endswith("."):
+            raise ValueError("Invalid email format")
+        
+        # Check for valid domain structure (must have at least 2 parts after the dot)
+        domain_parts = domain.split(".")
+        if len(domain_parts) < 2:
+            raise ValueError("Invalid email format")
+        
+        # Each domain part must be non-empty
+        for part in domain_parts:
+            if not part:
+                raise ValueError("Invalid email format")
+        
         return v
 
     @field_validator("username")
@@ -193,7 +240,11 @@ class AssetCurrentValue(BaseModel):
         if isinstance(v, datetime):
             return v
         if isinstance(v, str):
-            # Try common date formats
+            v = v.strip()
+            if not v:
+                raise ValueError("Date cannot be empty")
+            
+            # Try common date formats with strict validation
             for fmt in [
                 "%Y-%m-%d",
                 "%d/%m/%Y",
@@ -203,9 +254,23 @@ class AssetCurrentValue(BaseModel):
                 "%Y-%m-%d %H:%M:%S",
             ]:
                 try:
-                    return datetime.strptime(v, fmt)
-                except ValueError:
-                    continue
+                    parsed_date = datetime.strptime(v, fmt)
+                    # Additional validation for reasonable date ranges
+                    if parsed_date.year < 1900 or parsed_date.year > 2100:
+                        raise ValueError(f"Date year {parsed_date.year} is out of reasonable range")
+                    
+                    # Additional validation for month/day ranges
+                    if parsed_date.month < 1 or parsed_date.month > 12:
+                        raise ValueError(f"Invalid month: {parsed_date.month}")
+                    
+                    if parsed_date.day < 1 or parsed_date.day > 31:
+                        raise ValueError(f"Invalid day: {parsed_date.day}")
+                    
+                    return parsed_date
+                except ValueError as e:
+                    if "unconverted data remains" in str(e) or "time data" in str(e):
+                        continue
+                    raise
             raise ValueError(f"Unable to parse date: {v}")
         raise ValueError(f"Invalid date value: {v}")
 
@@ -247,6 +312,8 @@ class Transaction(BaseModel):
     @classmethod
     def parse_date(cls, v):
         """Parse various date formats."""
+        import pandas as pd
+        
         if isinstance(v, datetime):
             return v
         if isinstance(v, str):
@@ -264,6 +331,13 @@ class Transaction(BaseModel):
                 except ValueError:
                     continue
             raise ValueError(f"Unable to parse date: {v}")
+        
+        # Handle pandas datetime objects (including NaT)
+        if hasattr(v, '__class__') and 'pandas' in str(type(v)):
+            if pd.isna(v):
+                raise ValueError(f"Invalid date value: {v}")
+            return v
+            
         raise ValueError(f"Invalid date value: {v}")
 
     @field_validator("transaction_amount")
@@ -305,3 +379,25 @@ class Transaction(BaseModel):
             currency=record.currency,
             fee=record.fee,
         )
+
+
+class TransactionError(BaseModel):
+    """Model for storing failed transaction imports."""
+    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_encoders={ObjectId: str},
+    )
+    
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId = Field(..., description="User who attempted the import")
+    wallet_name: str = Field(..., description="Target wallet name")
+    filename: str = Field(..., description="Original filename")
+    row_index: int = Field(..., description="Row number in original file")
+    raw_data: dict = Field(..., description="Raw row data that failed")
+    error_message: str = Field(..., description="Error description")
+    error_type: str = Field(..., description="Type of error (validation, parsing, etc)")
+    transaction_type: str = Field(..., description="Intended transaction type")
+    asset_type: str = Field(..., description="Intended asset type")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    resolved: bool = Field(default=False, description="Whether error has been fixed")
