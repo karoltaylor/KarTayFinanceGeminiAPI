@@ -3,7 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, UTC
 
 from api.main import app
 from src.config.mongodb import MongoDBConfig
@@ -43,8 +43,8 @@ def test_db(unique_test_email, unique_test_username):
         "username": unique_test_username,
         "full_name": "Test User",
         "is_active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC)
     }
     test_user_2 = {
         "_id": test_user_id_2,
@@ -52,8 +52,8 @@ def test_db(unique_test_email, unique_test_username):
         "username": f"{unique_test_username}_2",
         "full_name": "Test User 2",
         "is_active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC)
     }
     
     db.users.update_one(
@@ -119,15 +119,15 @@ class TestListWallets:
             "user_id": ObjectId(test_user_id),
             "name": "Test Wallet 1",
             "description": "First test wallet",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC)
         }
         wallet2 = {
             "user_id": ObjectId(test_user_id),
             "name": "Test Wallet 2",
             "description": "Second test wallet",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC)
         }
         test_db.wallets.insert_many([wallet1, wallet2])
         
@@ -155,8 +155,8 @@ class TestListWallets:
                 "user_id": ObjectId(test_user_id),
                 "name": f"Wallet {i}",
                 "description": f"Test wallet {i}",
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC)
             }
             for i in range(5)
         ]
@@ -194,16 +194,16 @@ class TestListWallets:
         test_wallet = {
             "user_id": ObjectId(test_user_id),
             "name": "My Wallet",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC)
         }
         
         # Create wallet for different user
         other_user_wallet = {
             "user_id": ObjectId("507f1f77bcf86cd799439012"),  # Different user
             "name": "Other User Wallet",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC)
         }
         
         test_db.wallets.insert_many([test_wallet, other_user_wallet])
@@ -316,8 +316,8 @@ class TestDeleteWallet:
         wallet = {
             "user_id": ObjectId(test_user_id),
             "name": "Wallet to Delete",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC)
         }
         result = test_db.wallets.insert_one(wallet)
         wallet_id = str(result.inserted_id)
@@ -339,8 +339,8 @@ class TestDeleteWallet:
         wallet = {
             "user_id": ObjectId(test_user_id),
             "name": "Wallet with Transactions",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC)
         }
         result = test_db.wallets.insert_one(wallet)
         wallet_id = result.inserted_id
@@ -350,15 +350,14 @@ class TestDeleteWallet:
             {
                 "wallet_id": wallet_id,
                 "asset_id": ObjectId(),
-                "date": datetime.utcnow(),
-                "transaction_type": "buy",
+                "date": datetime.now(UTC),
                 "volume": 10.0,
                 "item_price": 100.0,
                 "transaction_amount": 1000.0,
                 "currency": "USD",
                 "fee": 5.0,
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC)
             }
             for _ in range(3)
         ]
@@ -397,8 +396,8 @@ class TestDeleteWallet:
         other_user_wallet = {
             "user_id": other_user_id,
             "name": "Other User Wallet Test",  # Unique name to avoid conflicts
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC)
         }
         result = test_db.wallets.insert_one(other_user_wallet)
         wallet_id = str(result.inserted_id)
@@ -423,8 +422,8 @@ class TestDeleteWallet:
         wallet = {
             "user_id": ObjectId(test_user_id),
             "name": "Protected Wallet",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC)
         }
         result = test_db.wallets.insert_one(wallet)
         wallet_id = str(result.inserted_id)

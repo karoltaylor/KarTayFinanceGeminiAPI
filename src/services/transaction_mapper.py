@@ -136,6 +136,12 @@ class TransactionMapper:
         else:
             df["currency"] = df["currency"].fillna("USD")
 
+        # Ensure transaction_type column exists with default value
+        if "transaction_type" not in df.columns:
+            df["transaction_type"] = "buy"  # Default transaction type
+        else:
+            df["transaction_type"] = df["transaction_type"].fillna("buy")
+
         return df
 
     def get_or_create_wallet(
@@ -248,10 +254,8 @@ class TransactionMapper:
     def dataframe_to_transactions(
         self,
         df: pd.DataFrame,
-        wallet_name: str,
+        wallet_id: PyObjectId,
         user_id: PyObjectId,
-        transaction_type: TransactionType = TransactionType.BUY,
-        asset_type: AssetType = AssetType.OTHER,
         wallets_collection=None,
         assets_collection=None,
     ) -> tuple[List[Transaction], List[dict]]:
@@ -259,11 +263,9 @@ class TransactionMapper:
         Convert a DataFrame of TransactionRecords to Transaction models.
 
         Args:
-            df: DataFrame with TransactionRecord columns
-            wallet_name: Name of the wallet for these transactions
+            df: DataFrame with TransactionRecord columns (including transaction_type)
+            wallet_id: ID of the wallet for these transactions
             user_id: User ID who owns the wallet
-            transaction_type: Type of transactions (default: BUY)
-            asset_type: Default asset type if not specified
             wallets_collection: MongoDB wallets collection (optional)
             assets_collection: MongoDB assets collection (optional)
 
@@ -273,9 +275,6 @@ class TransactionMapper:
         # Calculate missing values
         df = self.calculate_missing_values(df)
 
-        # Get or create wallet
-        wallet_id = self.get_or_create_wallet(wallet_name, user_id, wallets_collection)
-
         transactions = []
         error_records = []
 
@@ -284,10 +283,38 @@ class TransactionMapper:
                 # Create TransactionRecord first for validation
                 record = TransactionRecord(**row.to_dict())
 
+                # Determine transaction type from the record
+                detected_transaction_type = self._parse_transaction_type(record.transaction_type)
+
+                # Determine asset type automatically with caching and fallback
+                asset_name_lower = record.asset_name.lower()
+                
+                # Simple heuristic-based detection to reduce API calls
+                if any(keyword in asset_name_lower for keyword in ['akcji', 'stock', 'equity', 'share']):
+                    detected_asset_type = AssetType.STOCK
+                elif any(keyword in asset_name_lower for keyword in ['obligacje', 'bond', 'debt']):
+                    detected_asset_type = AssetType.BOND
+                elif any(keyword in asset_name_lower for keyword in ['krypto', 'crypto', 'bitcoin', 'ethereum']):
+                    detected_asset_type = AssetType.CRYPTOCURRENCY
+                elif any(keyword in asset_name_lower for keyword in ['złoto', 'gold', 'srebro', 'silver', 'commodity']):
+                    detected_asset_type = AssetType.COMMODITY
+                else:
+                    # Only use AI for unclear cases, with fallback
+                    try:
+                        asset_info = self.asset_type_mapper.infer_asset_info(record.asset_name)
+                        if asset_info and 'asset_type' in asset_info:
+                            detected_asset_type = AssetType(asset_info['asset_type'])
+                        else:
+                            detected_asset_type = AssetType.OTHER
+                    except Exception as e:
+                        # Fallback to OTHER if AI fails (rate limits, etc.)
+                        print(f"Warning: Asset type inference failed for '{record.asset_name}': {e}")
+                        detected_asset_type = AssetType.OTHER
+
                 # Get or create asset
                 asset_id = self.get_or_create_asset(
                     asset_name=record.asset_name,
-                    asset_type=asset_type,
+                    asset_type=detected_asset_type,
                     assets_collection=assets_collection,
                 )
 
@@ -296,7 +323,7 @@ class TransactionMapper:
                     record=record,
                     wallet_id=wallet_id,
                     asset_id=asset_id,
-                    transaction_type=transaction_type,
+                    transaction_type=detected_transaction_type,
                 )
 
                 transactions.append(transaction)
@@ -319,13 +346,47 @@ class TransactionMapper:
 
         return transactions, error_records
 
+    def _parse_transaction_type(self, transaction_type_str: str) -> TransactionType:
+        """
+        Parse transaction type string to TransactionType enum.
+        
+        Args:
+            transaction_type_str: String representation of transaction type
+            
+        Returns:
+            TransactionType enum value
+        """
+        if not transaction_type_str:
+            return TransactionType.BUY  # Default fallback
+            
+        # Normalize the string
+        normalized = str(transaction_type_str).strip().lower()
+        
+        # Map common transaction type strings to enum values
+        type_mapping = {
+            'buy': TransactionType.BUY,
+            'purchase': TransactionType.BUY,
+            'kupno': TransactionType.BUY,
+            'nabycie': TransactionType.BUY,
+            'sell': TransactionType.SELL,
+            'sale': TransactionType.SELL,
+            'sprzedaż': TransactionType.SELL,
+            'odkupienie': TransactionType.SELL,
+            'dividend': TransactionType.DIVIDEND,
+            'dywidenda': TransactionType.DIVIDEND,
+            'transfer_in': TransactionType.TRANSFER_IN,
+            'transfer_out': TransactionType.TRANSFER_OUT,
+            'deposit': TransactionType.TRANSFER_IN,
+            'withdrawal': TransactionType.TRANSFER_OUT,
+        }
+        
+        return type_mapping.get(normalized, TransactionType.BUY)
+
     def transaction_records_to_transactions(
         self,
         records: List[TransactionRecord],
-        wallet_name: str,
+        wallet_id: PyObjectId,
         user_id: PyObjectId,
-        transaction_type: TransactionType = TransactionType.BUY,
-        asset_type: AssetType = AssetType.OTHER,
         wallets_collection=None,
         assets_collection=None,
     ) -> List[Transaction]:
@@ -334,18 +395,14 @@ class TransactionMapper:
 
         Args:
             records: List of TransactionRecord instances
-            wallet_name: Name of the wallet for these transactions
+            wallet_id: ID of the wallet for these transactions
             user_id: User ID who owns the wallet
-            transaction_type: Type of transactions (default: BUY)
-            asset_type: Default asset type if not specified
             wallets_collection: MongoDB wallets collection (optional)
             assets_collection: MongoDB assets collection (optional)
 
         Returns:
             List of Transaction models
         """
-        # Get or create wallet
-        wallet_id = self.get_or_create_wallet(wallet_name, user_id, wallets_collection)
 
         transactions = []
 
@@ -353,7 +410,7 @@ class TransactionMapper:
             # Get or create asset
             asset_id = self.get_or_create_asset(
                 asset_name=record.asset_name,
-                asset_type=asset_type,
+                asset_type=AssetType.OTHER,  # Default asset type
                 assets_collection=assets_collection,
             )
 
@@ -362,7 +419,7 @@ class TransactionMapper:
                 record=record,
                 wallet_id=wallet_id,
                 asset_id=asset_id,
-                transaction_type=transaction_type,
+                transaction_type=TransactionType(record.transaction_type),
             )
 
             transactions.append(transaction)

@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 import os
 import json
 import logging
@@ -101,7 +101,7 @@ async def receive_logs(batch: LogBatch):
             "status": "success",
             "message": f"{saved_count} logs saved successfully",
             "count": saved_count,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(UTC).isoformat() + "Z"
         }
         
     except Exception as e:
@@ -111,7 +111,7 @@ async def receive_logs(batch: LogBatch):
             "status": "error",
             "message": str(e),
             "count": 0,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(UTC).isoformat() + "Z"
         }
 
 
@@ -149,12 +149,12 @@ async def log_health_check():
             "directory_exists": logs_dir_exists,
             "directory_writable": logs_dir_writable,
             "log_files": log_files,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(UTC).isoformat() + "Z"
         }
         
     except Exception as e:
         return {
             "status": "unhealthy",
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(UTC).isoformat() + "Z"
         }

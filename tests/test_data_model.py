@@ -38,6 +38,7 @@ class TestTransactionRecord:
                 "volume": 1,
                 "transaction_amount": 100.0,
                 "currency": "USD",
+                "transaction_type": "buy",
             }
             record = TransactionRecord(**data)
             assert isinstance(record.date, datetime)
@@ -81,6 +82,7 @@ class TestTransactionRecord:
             "volume": 1,
             "transaction_amount": 100.0,
             "currency": "USD",
+            "transaction_type": "buy",
         }
         record = TransactionRecord(**data)
 

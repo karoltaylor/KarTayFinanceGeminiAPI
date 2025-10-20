@@ -1,7 +1,7 @@
 """Comprehensive integration tests for real database operations."""
 
 import pytest
-from datetime import datetime
+from datetime import datetime, UTC
 from bson import ObjectId
 from fastapi.testclient import TestClient
 import tempfile
@@ -42,8 +42,8 @@ def test_db(unique_test_email, unique_test_username):
         "username": unique_test_username,
         "full_name": "Test User",
         "is_active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC)
     }
     test_user_2 = {
         "_id": test_user_id_2,
@@ -51,8 +51,8 @@ def test_db(unique_test_email, unique_test_username):
         "username": f"{unique_test_username}_2",
         "full_name": "Test User 2",
         "is_active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC)
     }
     
     db.users.update_one(
@@ -130,7 +130,6 @@ class TestRealDatabaseOperations:
                     files={"file": ("transactions.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Database Test Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -196,7 +195,6 @@ class TestRealDatabaseOperations:
                     files={"file": ("transactions.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Consistency Test Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -263,7 +261,6 @@ class TestRealDatabaseOperations:
                     files={"file": ("transactions.csv", f, "text/csv")},
                     data={
                         "wallet_name": "FK Test Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -335,7 +332,6 @@ class TestRealDatabaseOperations:
                     files={"file": ("large_transactions.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Performance Test Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -406,7 +402,6 @@ class TestRealDatabaseOperations:
                         files={"file": ("transactions.csv", f, "text/csv")},
                         data={
                             "wallet_name": wallet_name,
-                            "transaction_type": "buy",
                             "asset_type": "stock"
                         }
                     )
@@ -468,7 +463,6 @@ class TestRealDatabaseOperations:
                     files={"file": ("mixed_transactions.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Error Recovery Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -536,7 +530,6 @@ class TestRealDatabaseOperations:
                     files={"file": ("transactions.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Persistence Test Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -603,7 +596,6 @@ class TestRealDatabaseOperations:
                         files={"file": ("transactions.csv", f, "text/csv")},
                         data={
                             "wallet_name": f"Index Test Wallet {i}",
-                            "transaction_type": "buy",
                             "asset_type": "stock"
                         }
                     )

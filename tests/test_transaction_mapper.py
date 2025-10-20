@@ -144,15 +144,15 @@ class TestTransactionMapper:
                 "transaction_amount": [1500.0, 22500.0],
                 "fee": [5.0, 10.0],
                 "currency": ["USD", "USD"],
+                "transaction_type": ["buy", "sell"],
             }
         )
 
+        wallet_id = ObjectId()  # Mock wallet ID
         transactions, errors = mapper.dataframe_to_transactions(
             df=df,
-            wallet_name="My Wallet",
+            wallet_id=wallet_id,
             user_id=user_id,
-            transaction_type=TransactionType.BUY,
-            asset_type=AssetType.STOCK,
         )
 
         assert len(transactions) == 2
@@ -176,11 +176,13 @@ class TestTransactionMapper:
                 "volume": [10.0],
                 "transaction_amount": [1500.0],
                 "currency": ["USD"],
+                "transaction_type": ["buy"],
             }
         )
 
+        wallet_id = ObjectId()  # Mock wallet ID
         transactions, errors = mapper.dataframe_to_transactions(
-            df=df, wallet_name="My Wallet", user_id=user_id, transaction_type=TransactionType.BUY
+            df=df, wallet_id=wallet_id, user_id=user_id
         )
 
         assert len(transactions) == 1
@@ -200,6 +202,7 @@ class TestTransactionMapper:
                 transaction_amount=1500.0,
                 fee=5.0,
                 currency="USD",
+                transaction_type="buy",
             ),
             TransactionRecord(
                 asset_name="BTC",
@@ -209,15 +212,15 @@ class TestTransactionMapper:
                 transaction_amount=22500.0,
                 fee=10.0,
                 currency="USD",
+                transaction_type="sell",
             ),
         ]
 
+        wallet_id = ObjectId()  # Mock wallet ID
         transactions = mapper.transaction_records_to_transactions(
             records=records,
-            wallet_name="Investment Wallet",
+            wallet_id=wallet_id,
             user_id=user_id,
-            transaction_type=TransactionType.BUY,
-            asset_type=AssetType.STOCK,
         )
 
         assert len(transactions) == 2
@@ -256,10 +259,12 @@ class TestTransactionMapper:
                 "volume": [10.0, 0.5],
                 "transaction_amount": [1500.0, 22500.0],
                 "currency": ["USD", "USD"],
+                "transaction_type": ["buy", "sell"],
             }
         )
 
-        transactions, errors = mapper.dataframe_to_transactions(df=df, wallet_name="My Wallet", user_id=user_id)
+        wallet_id = ObjectId()  # Mock wallet ID
+        transactions, errors = mapper.dataframe_to_transactions(df=df, wallet_id=wallet_id, user_id=user_id)
 
         # Only valid rows should be converted
         assert len(transactions) == 1

@@ -1,7 +1,7 @@
 """Edge case and performance tests for comprehensive coverage."""
 
 import pytest
-from datetime import datetime
+from datetime import datetime, UTC
 from bson import ObjectId
 from fastapi.testclient import TestClient
 import tempfile
@@ -43,8 +43,8 @@ def test_db(unique_test_email, unique_test_username):
         "username": unique_test_username,
         "full_name": "Test User",
         "is_active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC)
     }
     test_user_2 = {
         "_id": test_user_id_2,
@@ -52,8 +52,8 @@ def test_db(unique_test_email, unique_test_username):
         "username": f"{unique_test_username}_2",
         "full_name": "Test User 2",
         "is_active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC)
     }
     
     db.users.update_one(
@@ -134,7 +134,6 @@ class TestEdgeCases:
                     files={"file": ("large_file.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Large File Test",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -176,7 +175,6 @@ class TestEdgeCases:
                     files={"file": ("empty.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Empty File Test",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -202,7 +200,6 @@ class TestEdgeCases:
                     files={"file": ("headers_only.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Headers Only Test",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -241,7 +238,6 @@ class TestEdgeCases:
                     files={"file": ("mixed_data.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Mixed Data Test",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -289,7 +285,6 @@ class TestEdgeCases:
                     files={"file": ("long_fields.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Long Fields Test",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -323,7 +318,6 @@ class TestEdgeCases:
                     files={"file": ("special_chars.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Special Chars Test",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -372,7 +366,6 @@ class TestEdgeCases:
                     files={"file": ("unicode_chars.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Unicode Test",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -415,7 +408,6 @@ class TestEdgeCases:
                     files={"file": ("extreme_values.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Extreme Values Test",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -452,7 +444,6 @@ class TestEdgeCases:
                     files={"file": ("malformed.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Malformed CSV Test",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -493,7 +484,6 @@ class TestEdgeCases:
                         files={"file": ("concurrent.csv", f, "text/csv")},
                         data={
                             "wallet_name": wallet_name,
-                            "transaction_type": "buy",
                             "asset_type": "stock"
                         }
                     )
@@ -586,7 +576,6 @@ class TestEdgeCases:
                     files={"file": ("memory_test.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Memory Test Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -636,7 +625,6 @@ class TestEdgeCases:
                     files={"file": ("connection_test.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Connection Test Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -671,7 +659,6 @@ class TestEdgeCases:
                     files={"file": ("boundary_test.csv", f, "text/csv")},
                     data={
                         "wallet_name": max_wallet_name,
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -712,7 +699,6 @@ class TestEdgeCases:
                     files={"file": ("timezone_test.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Timezone Test Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )

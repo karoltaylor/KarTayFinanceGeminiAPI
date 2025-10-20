@@ -1,7 +1,7 @@
 """MongoDB data models for financial tracking system."""
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List, Dict
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from bson import ObjectId
@@ -401,3 +401,24 @@ class TransactionError(BaseModel):
     asset_type: str = Field(..., description="Intended asset type")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     resolved: bool = Field(default=False, description="Whether error has been fixed")
+
+
+class ColumnMappingCache(BaseModel):
+    """Cache for column mappings to avoid redundant AI calls."""
+    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_encoders={ObjectId: str},
+    )
+    
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId = Field(..., description="User who owns this cache entry")
+    cache_key: str = Field(..., description="Hash of column_names + file_type + column_count")
+    column_names: List[str] = Field(..., description="Original column names from file")
+    file_type: str = Field(..., description="File type (csv, xlsx, xls)")
+    column_count: int = Field(..., description="Number of columns")
+    mapping: Dict[str, Optional[str]] = Field(..., description="Column mapping dictionary")
+    version: int = Field(default=1, description="Cache version for invalidation")
+    hit_count: int = Field(default=0, description="Number of times this cache was used")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_used_at: datetime = Field(default_factory=datetime.utcnow)

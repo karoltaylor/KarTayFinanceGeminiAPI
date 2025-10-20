@@ -26,9 +26,9 @@ class TestDataPipeline:
     ):
         """Test processing file to transactions."""
         # Create a well-structured CSV file
-        csv_content = """Date,Asset,Price,Quantity,Total,Fee,Currency
-2024-01-10,AAPL,150.50,10,1505.00,5.00,USD
-2024-01-11,GOOGL,140.00,5,700.00,3.00,USD
+        csv_content = """Date,Asset,Price,Quantity,Total,Fee,Currency,Transaction Type
+2024-01-10,AAPL,150.50,10,1505.00,5.00,USD,buy
+2024-01-11,GOOGL,140.00,5,700.00,3.00,USD,sell
 """
         filepath = temp_dir / "transactions.csv"
         filepath.write_text(csv_content)
@@ -43,21 +43,21 @@ class TestDataPipeline:
             "volume": "Quantity",
             "transaction_amount": "Total",
             "fee": "Fee",
-            "currency": "Currency"
+            "currency": "Currency",
+            "transaction_type": "Transaction Type"
         }"""
         mock_model.generate_content.return_value = mock_response
         mock_genai.GenerativeModel.return_value = mock_model
 
         pipeline = DataPipeline(api_key="test_key")
         user_id = ObjectId()
+        wallet_id = ObjectId()  # Mock wallet ID
 
         # Process file to transactions
         transactions, errors = pipeline.process_file_to_transactions(
             filepath=filepath,
-            wallet_name="Test Wallet",
+            wallet_id=wallet_id,
             user_id=user_id,
-            transaction_type=TransactionType.BUY,
-            asset_type=AssetType.STOCK,
         )
 
         # Should return list of Transaction models

@@ -1,7 +1,7 @@
 """Database constraint and relationship tests."""
 
 import pytest
-from datetime import datetime
+from datetime import datetime, UTC
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
@@ -41,8 +41,8 @@ def test_db(unique_test_email, unique_test_username):
         "username": unique_test_username,
         "full_name": "Test User",
         "is_active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC)
     }
     test_user_2 = {
         "_id": test_user_id_2,
@@ -50,8 +50,8 @@ def test_db(unique_test_email, unique_test_username):
         "username": f"{unique_test_username}_2",
         "full_name": "Test User 2",
         "is_active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC)
     }
     
     db.users.update_one(
@@ -151,8 +151,8 @@ class TestDatabaseConstraints:
         
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, newline='')
         writer = csv.writer(temp_file)
-        writer.writerow(['Asset Name', 'Date', 'Price', 'Volume', 'Total', 'Fee', 'Currency'])
-        writer.writerow(['Test Asset', '2024-01-15', '100.00', '10', '1000.00', '2.50', 'USD'])
+        writer.writerow(['Asset Name', 'Date', 'Price', 'Volume', 'Total', 'Fee', 'Currency', 'Transaction Type'])
+        writer.writerow(['Test Asset', '2024-01-15', '100.00', '10', '1000.00', '2.50', 'USD', 'buy'])
         temp_file.close()
         
         try:
@@ -162,15 +162,14 @@ class TestDatabaseConstraints:
                     headers=auth_headers,
                     files={"file": ("transactions.csv", f, "text/csv")},
                     data={
-                        "wallet_name": "Test Wallet",
-                        "transaction_type": "buy",
+                        "wallet_id": wallet_id,
                         "asset_type": "stock"
                     }
                 )
             assert upload_response.status_code == 200
             
             # Verify transaction was created with valid foreign keys
-            transactions_response = client.get("/api/transactions", headers=auth_headers)
+            transactions_response = client.get(f"/api/transactions?wallet_id={wallet_id}", headers=auth_headers)
             assert transactions_response.status_code == 200
             transactions = transactions_response.json()["transactions"]
             assert len(transactions) > 0
@@ -214,7 +213,6 @@ class TestDatabaseConstraints:
                     files={"file": ("transactions.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Wallet to Delete",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -246,9 +244,12 @@ class TestDatabaseConstraints:
         assert response1.status_code == 200
         wallet_id = response1.json()["data"]["_id"]
         
-        # User 2 tries to access User 1's wallet
-        response2 = client.get(f"/api/wallets/{wallet_id}", headers=auth_headers_user2)
-        assert response2.status_code == 404
+        # User 2 tries to access User 1's wallet by listing wallets
+        response2 = client.get("/api/wallets", headers=auth_headers_user2)
+        assert response2.status_code == 200
+        # User 2 should not see User 1's wallet
+        user2_wallets = response2.json()["data"]
+        assert len(user2_wallets) == 0
         
         # User 2 tries to delete User 1's wallet
         response3 = client.delete(f"/api/wallets/{wallet_id}", headers=auth_headers_user2)
@@ -278,7 +279,6 @@ class TestDatabaseConstraints:
                     files={"file": ("transactions.csv", f, "text/csv")},
                     data={
                         "wallet_name": "User1 Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -292,7 +292,6 @@ class TestDatabaseConstraints:
                     files={"file": ("transactions.csv", f, "text/csv")},
                     data={
                         "wallet_name": "User2 Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
@@ -321,16 +320,25 @@ class TestDatabaseConstraints:
 
     def test_asset_reference_integrity(self, client, test_db, auth_headers):
         """Test that assets are properly referenced in transactions."""
+        # Create wallet first
+        wallet_response = client.post(
+            "/api/wallets",
+            json={"name": "Asset Test Wallet", "description": "For testing"},
+            headers=auth_headers
+        )
+        assert wallet_response.status_code == 200
+        wallet_id = wallet_response.json()["data"]["_id"]
+        
         # Upload transactions to create assets and transactions
         import tempfile
         import csv
-        
+
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, newline='')
         writer = csv.writer(temp_file)
-        writer.writerow(['Asset Name', 'Date', 'Price', 'Volume', 'Total', 'Fee', 'Currency'])
-        writer.writerow(['Test Asset', '2024-01-15', '100.00', '10', '1000.00', '2.50', 'USD'])
+        writer.writerow(['Asset Name', 'Date', 'Price', 'Volume', 'Total', 'Fee', 'Currency', 'Transaction Type'])
+        writer.writerow(['Test Asset', '2024-01-15', '100.00', '10', '1000.00', '2.50', 'USD', 'buy'])
         temp_file.close()
-        
+
         try:
             with open(temp_file.name, 'rb') as f:
                 upload_response = client.post(
@@ -338,15 +346,13 @@ class TestDatabaseConstraints:
                     headers=auth_headers,
                     files={"file": ("transactions.csv", f, "text/csv")},
                     data={
-                        "wallet_name": "Test Wallet",
-                        "transaction_type": "buy",
-                        "asset_type": "stock"
+                        "wallet_id": wallet_id
                     }
                 )
             assert upload_response.status_code == 200
             
             # Get transactions and verify asset references
-            transactions_response = client.get("/api/transactions", headers=auth_headers)
+            transactions_response = client.get(f"/api/transactions?wallet_id={wallet_id}", headers=auth_headers)
             transactions = transactions_response.json()["transactions"]
             assert len(transactions) > 0
             
@@ -379,8 +385,8 @@ class TestDatabaseConstraints:
         
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, newline='')
         writer = csv.writer(temp_file)
-        writer.writerow(['Asset Name', 'Date', 'Price', 'Volume', 'Total', 'Fee', 'Currency'])
-        writer.writerow(['Test Asset', '2024-01-15', '100.00', '10', '1000.00', '2.50', 'USD'])
+        writer.writerow(['Asset Name', 'Date', 'Price', 'Volume', 'Total', 'Fee', 'Currency', 'Transaction Type'])
+        writer.writerow(['Test Asset', '2024-01-15', '100.00', '10', '1000.00', '2.50', 'USD', 'buy'])
         temp_file.close()
         
         try:
@@ -391,14 +397,13 @@ class TestDatabaseConstraints:
                     files={"file": ("transactions.csv", f, "text/csv")},
                     data={
                         "wallet_name": "Reference Test Wallet",
-                        "transaction_type": "buy",
                         "asset_type": "stock"
                     }
                 )
             assert upload_response.status_code == 200
             
             # Get transactions and verify wallet references
-            transactions_response = client.get("/api/transactions", headers=auth_headers)
+            transactions_response = client.get(f"/api/transactions?wallet_id={wallet_id}", headers=auth_headers)
             transactions = transactions_response.json()["transactions"]
             assert len(transactions) > 0
             
@@ -427,7 +432,7 @@ class TestDatabaseConstraints:
             "error_type": "validation",
             "transaction_type": "buy",
             "asset_type": "stock",
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC),
             "resolved": False
         }
         
@@ -485,8 +490,8 @@ class TestDatabaseConstraints:
             test_db.wallets.insert_one({
                 "user_id": "invalid-objectid",
                 "name": "Test Wallet",
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC)
             })
         
         # Test that required fields are enforced
@@ -494,8 +499,8 @@ class TestDatabaseConstraints:
             test_db.wallets.insert_one({
                 "user_id": ObjectId(),
                 # Missing required 'name' field
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC)
             })
 
     def test_concurrent_operations_constraint(self, client, test_db, auth_headers):
@@ -532,7 +537,6 @@ class TestDatabaseConstraints:
                         files={"file": ("transactions.csv", f, "text/csv")},
                         data={
                             "wallet_name": wallet_name,
-                            "transaction_type": "buy",
                             "asset_type": "stock"
                         }
                     )

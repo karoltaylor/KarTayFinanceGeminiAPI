@@ -76,6 +76,7 @@ class Settings:
         "transaction_amount",
         "fee",
         "currency",
+        "transaction_type",
     ]
 
     @classmethod

@@ -196,6 +196,18 @@ class MongoDBConfig:
         db.transactions.create_index("transaction_type")
         db.transactions.create_index([("wallet_id", 1), ("date", -1)])
         print("[DEBUG] Transactions indexes created")
+        
+        # Create indexes for column_mapping_cache
+        print("[DEBUG] Creating indexes for column_mapping_cache collection...")
+        db.column_mapping_cache.create_index(
+            [("user_id", 1), ("cache_key", 1), ("version", 1)],
+            unique=True,
+            name="user_cache_key_version_idx"
+        )
+        db.column_mapping_cache.create_index("last_used_at")
+        db.column_mapping_cache.create_index("hit_count")
+        print("[DEBUG] Column_mapping_cache indexes created")
+        
         print("[DEBUG] All indexes created successfully!")
 
 

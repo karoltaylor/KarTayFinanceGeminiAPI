@@ -16,6 +16,7 @@ class TransactionRecord(BaseModel):
     transaction_amount: float = Field(..., description="Total transaction amount")
     fee: float = Field(default=0.0, ge=0, description="Transaction fee")
     currency: str = Field(..., min_length=1, max_length=10, description="Currency code")
+    transaction_type: str = Field(..., description="Type of transaction (buy, sell, dividend, etc.)")
 
     @field_validator("asset_price", "volume", "transaction_amount")
     @classmethod

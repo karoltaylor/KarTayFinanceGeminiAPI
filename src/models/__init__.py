@@ -9,6 +9,7 @@ from .mongodb_models import (
     Transaction,
     TransactionType,
     TransactionError,
+    ColumnMappingCache,
     PyObjectId,
 )
 
@@ -22,5 +23,6 @@ __all__ = [
     "Transaction",
     "TransactionType",
     "TransactionError",
+    "ColumnMappingCache",
     "PyObjectId",
 ]

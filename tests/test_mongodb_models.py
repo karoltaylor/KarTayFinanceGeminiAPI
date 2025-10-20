@@ -234,6 +234,7 @@ class TestTransaction:
             transaction_amount=1505.00,
             fee=5.0,
             currency="USD",
+            transaction_type="buy",
         )
 
         # Convert to Transaction
