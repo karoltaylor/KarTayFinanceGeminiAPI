@@ -25,7 +25,7 @@ def _get_active_env_file():
 
 
 def _load_env_once():
-    """Load environment variables once."""
+    """Load environment variables once and return them as a dictionary."""
     # Only try to load .env files if not running in Lambda
     # In Lambda, environment variables are already set by AWS
     is_lambda = bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
@@ -33,16 +33,51 @@ def _load_env_once():
     print(f"[DEBUG] Environment detection - Is Lambda: {is_lambda}")
     print(f"[DEBUG] AWS_LAMBDA_FUNCTION_NAME: {os.getenv('AWS_LAMBDA_FUNCTION_NAME', 'Not set')}")
     
+    env_vars = {}
+    
     if not is_lambda:
         env_file = _get_active_env_file()
         print(f"[DEBUG] Loading env file: {env_file}")
-        load_dotenv(env_file, override=False)  # Don't override existing env vars
+        
+        if env_file and Path(env_file).exists():
+            try:
+                # Parse the .env file manually to return the variables
+                with open(env_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        # Skip empty lines and comments
+                        if not line or line.startswith('#'):
+                            continue
+                        
+                        # Parse KEY=VALUE format
+                        if '=' in line:
+                            key, value = line.split('=', 1)
+                            key = key.strip()
+                            value = value.strip()
+                            
+                            # Remove quotes if present
+                            if (value.startswith('"') and value.endswith('"')) or \
+                               (value.startswith("'") and value.endswith("'")):
+                                value = value[1:-1]
+                            
+                            env_vars[key] = value
+                
+                # Also load into environment using load_dotenv
+                load_dotenv(env_file, override=False)  # Don't override existing env vars
+            except Exception as e:
+                print(f"[DEBUG] Error loading env file {env_file}: {e}")
+                return {}
+        else:
+            print(f"[DEBUG] Env file {env_file} does not exist")
+            return {}
     else:
         print("[DEBUG] Running in Lambda - skipping .env file loading")
+    
+    return env_vars
 
 
 # Load environment on module import
-_load_env_once()
+_env_vars = _load_env_once()
 
 
 class MongoDBConfig:
