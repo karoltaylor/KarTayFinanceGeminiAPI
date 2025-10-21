@@ -50,7 +50,10 @@ jobs:
         echo "GENAI_MODEL=gemini-1.5-flash-latest" >> $GITHUB_ENV
 
 
-    - name: Run all tests with coverage
+    - name: Run unit tests with coverage
+      env:
+        MONGODB_URL: ""
+        MONGODB_DATABASE: ""
       run: |
         pytest -m unit --cov=src --cov=api --cov-branch --cov-report=xml --cov-report=term-missing
 

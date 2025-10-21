@@ -24,11 +24,15 @@ def _get_active_env_file():
     return os.getenv("ENV_FILE", ".env")
 
 
-def _load_env_once():
+def _load_env_once(
+    env_file_override: Optional[str] = None,
+    is_lambda_override: Optional[bool] = None,
+    is_ci_override: Optional[bool] = None
+):
     """Load environment variables once and return them as a dictionary."""
     # Only try to load .env files if not running in Lambda
     # In Lambda, environment variables are already set by AWS
-    is_lambda = bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+    is_lambda = is_lambda_override if is_lambda_override is not None else bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 
     print(f"[DEBUG] Environment detection - Is Lambda: {is_lambda}")
     print(
@@ -38,7 +42,7 @@ def _load_env_once():
     env_vars = {}
 
     if not is_lambda:
-        env_file = _get_active_env_file()
+        env_file = env_file_override if env_file_override is not None else _get_active_env_file()
         print(f"[DEBUG] Loading env file: {env_file}")
 
         if env_file and Path(env_file).exists():
@@ -89,7 +93,7 @@ def _load_env_once():
                 "JENKINS_URL",
                 "BUILD_NUMBER",
             ]
-            is_ci = any(os.getenv(indicator) for indicator in ci_indicators)
+            is_ci = is_ci_override if is_ci_override is not None else any(os.getenv(indicator) for indicator in ci_indicators)
 
             if is_ci:
                 print(
@@ -111,8 +115,7 @@ def _load_env_once():
     return env_vars
 
 
-# Load environment on module import
-_env_vars = _load_env_once()
+# Environment variables are loaded lazily when needed
 
 
 class MongoDBConfig:
