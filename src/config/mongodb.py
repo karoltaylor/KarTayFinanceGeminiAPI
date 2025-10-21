@@ -71,10 +71,28 @@ def _load_env_once():
                 )  # Don't override existing env vars
             except Exception as e:
                 print(f"[DEBUG] Error loading env file {env_file}: {e}")
-                return {}
-        else:
-            print(f"[DEBUG] Env file {env_file} does not exist")
-            return {}
+                # Fall back to existing environment variables
+                pass
+        
+        # If no .env file was loaded or file doesn't exist, 
+        # check for MongoDB-related environment variables only in CI/container environments
+        if not env_vars:
+            print("[DEBUG] No .env file loaded, checking existing environment variables")
+            # Only fall back to environment variables if we're likely in a CI/container environment
+            # Check for common CI environment indicators
+            ci_indicators = ['GITHUB_ACTIONS', 'CI', 'CONTINUOUS_INTEGRATION', 'JENKINS_URL', 'BUILD_NUMBER']
+            is_ci = any(os.getenv(indicator) for indicator in ci_indicators)
+            
+            if is_ci:
+                print("[DEBUG] Detected CI environment, checking for MongoDB environment variables")
+                mongodb_vars = ['MONGODB_URL', 'MONGODB_DATABASE']
+                for var in mongodb_vars:
+                    value = os.getenv(var)
+                    if value:
+                        env_vars[var] = value
+                        print(f"[DEBUG] Found {var} in environment")
+            else:
+                print("[DEBUG] Not in CI environment, skipping environment variable fallback")
     else:
         print("[DEBUG] Running in Lambda - skipping .env file loading")
 
