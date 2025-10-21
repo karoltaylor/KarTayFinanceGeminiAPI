@@ -6,22 +6,23 @@ import os
 import argparse
 from pathlib import Path
 
+
 def get_available_environments():
     """Get list of available environment configuration files."""
     env_files = []
-    
+
     # Check for config.*.env files in config/ directory
     config_dir = Path("config")
     if config_dir.exists():
         for file in config_dir.glob("config.*.env"):
             env_name = file.stem.replace("config.", "")
             env_files.append(env_name)
-    
+
     # Also check for config.*.env files in root directory (backward compatibility)
     for file in Path(".").glob("config.*.env"):
         env_name = file.stem.replace("config.", "")
         env_files.append(env_name)
-    
+
     # Also check for standard .env files
     if Path(".env").exists():
         env_files.append("default")
@@ -29,30 +30,32 @@ def get_available_environments():
         env_files.append("local")
     if Path(".env.production").exists():
         env_files.append("production")
-    
+
     return sorted(set(env_files))
+
 
 def get_env_file_path(env_name):
     """Get the path to the environment file based on name."""
     if env_name == "default":
         return ".env"
-    
+
     # Try config/config.{env_name}.env format first (new location)
     config_file = f"config/config.{env_name}.env"
     if Path(config_file).exists():
         return config_file
-    
+
     # Try config.{env_name}.env format (backward compatibility)
     config_file = f"config.{env_name}.env"
     if Path(config_file).exists():
         return config_file
-    
+
     # Try .env.{env_name} format
     dotenv_file = f".env.{env_name}"
     if Path(dotenv_file).exists():
         return dotenv_file
-    
+
     raise FileNotFoundError(f"Environment file not found for '{env_name}'")
+
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -64,49 +67,42 @@ Examples:
   python start_api.py --env local        # Use config.local.env
   python start_api.py --env production   # Use config.production.env
   python start_api.py                    # Use .env (default)
-        """
+        """,
     )
-    
+
     available_envs = get_available_environments()
     parser.add_argument(
         "--env",
         type=str,
-       # default="local",
+        # default="local",
         choices=available_envs if available_envs else ["local"],
-        help=f"Environment to use. Available: {', '.join(available_envs) if available_envs else 'none found'}"
+        help=f"Environment to use. Available: {', '.join(available_envs) if available_envs else 'none found'}",
     )
-    
+
     parser.add_argument(
-        "--host",
-        type=str,
-        default="0.0.0.0",
-        help="Host to bind to (default: 0.0.0.0)"
+        "--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)"
     )
-    
+
     parser.add_argument(
-        "--port",
-        type=int,
-        default=8000,
-        help="Port to bind to (default: 8000)"
+        "--port", type=int, default=8000, help="Port to bind to (default: 8000)"
     )
-    
+
     parser.add_argument(
-        "--no-reload",
-        action="store_true",
-        help="Disable auto-reload on code changes"
+        "--no-reload", action="store_true", help="Disable auto-reload on code changes"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Set the environment file
     try:
         env_file = get_env_file_path(args.env)
         os.environ["ENV_FILE"] = env_file
-        
+
         # Write to .active_env file so hot-reload workers can pick it up
         from pathlib import Path
+
         Path(".active_env").write_text(env_file)
-        
+
         print("=" * 70)
         print("Starting Financial Transaction API")
         print("=" * 70)
@@ -132,10 +128,12 @@ Examples:
         except KeyboardInterrupt:
             print("\n\nShutting down API server...")
             sys.exit(0)
-            
+
     except FileNotFoundError as e:
         print(f"❌ Error: {e}")
-        print(f"\n💡 Available environments: {', '.join(available_envs) if available_envs else 'none found'}")
+        print(
+            f"\n💡 Available environments: {', '.join(available_envs) if available_envs else 'none found'}"
+        )
         print("\n📝 Create a config file:")
         print(f"   - config.local.env for local development")
         print(f"   - config.production.env for production")
