@@ -3,12 +3,11 @@
 from fastapi import APIRouter, Depends
 from bson import ObjectId
 from pymongo.database import Database
-from typing import Dict, List
+from typing import List
 from pydantic import BaseModel
 
 from src.config.mongodb import get_db
 from src.auth.firebase_auth import get_current_user_from_token
-from src.models.mongodb_models import AssetType
 
 router = APIRouter(prefix="/api/stats", tags=["Statistics"])
 
