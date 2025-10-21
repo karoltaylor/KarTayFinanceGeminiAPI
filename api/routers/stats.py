@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/stats", tags=["Statistics"])
 
 class AssetTypePercentage(BaseModel):
     """Asset type percentage breakdown."""
+
     asset_type: str
     percentage: float
     total_value: float
@@ -23,6 +24,7 @@ class AssetTypePercentage(BaseModel):
 
 class UserAssetStatistics(BaseModel):
     """User asset statistics with percentage breakdown."""
+
     total_portfolio_value: float
     asset_type_breakdown: List[AssetTypePercentage]
     total_transactions: int
@@ -83,7 +85,11 @@ async def get_statistics(
     return stats
 
 
-@router.get("/asset-types", summary="Get user asset type percentages", response_model=UserAssetStatistics)
+@router.get(
+    "/asset-types",
+    summary="Get user asset type percentages",
+    response_model=UserAssetStatistics,
+)
 async def get_asset_type_percentages(
     user_id: ObjectId = Depends(get_current_user_from_token),
     db: Database = Depends(get_db),
@@ -116,61 +122,52 @@ async def get_asset_type_percentages(
             total_portfolio_value=0.0,
             asset_type_breakdown=[],
             total_transactions=0,
-            unique_assets=0
+            unique_assets=0,
         )
 
     # Aggregate pipeline to get asset type statistics
     pipeline = [
         # Match transactions from user's wallets
         {"$match": {"wallet_id": {"$in": wallet_ids}}},
-        
         # Lookup asset information
         {
             "$lookup": {
                 "from": "assets",
                 "localField": "asset_id",
                 "foreignField": "_id",
-                "as": "asset"
+                "as": "asset",
             }
         },
-        
         # Unwind asset array (should have exactly one element)
         {"$unwind": "$asset"},
-        
         # Group by asset type and calculate totals
         {
             "$group": {
                 "_id": "$asset.asset_type",
                 "total_value": {"$sum": "$transaction_amount"},
                 "transaction_count": {"$sum": 1},
-                "unique_assets": {"$addToSet": "$asset_id"}
+                "unique_assets": {"$addToSet": "$asset_id"},
             }
         },
-        
         # Calculate unique asset count per type
-        {
-            "$addFields": {
-                "unique_assets": {"$size": "$unique_assets"}
-            }
-        },
-        
+        {"$addFields": {"unique_assets": {"$size": "$unique_assets"}}},
         # Sort by total value descending
-        {"$sort": {"total_value": -1}}
+        {"$sort": {"total_value": -1}},
     ]
 
     asset_type_stats = list(db.transactions.aggregate(pipeline))
-    
+
     if not asset_type_stats:
         return UserAssetStatistics(
             total_portfolio_value=0.0,
             asset_type_breakdown=[],
             total_transactions=0,
-            unique_assets=0
+            unique_assets=0,
         )
 
     # Calculate total portfolio value
     total_portfolio_value = sum(stat["total_value"] for stat in asset_type_stats)
-    
+
     # Calculate total transactions and unique assets
     total_transactions = sum(stat["transaction_count"] for stat in asset_type_stats)
     all_unique_assets = set()
@@ -183,12 +180,12 @@ async def get_asset_type_percentages(
                     "from": "assets",
                     "localField": "asset_id",
                     "foreignField": "_id",
-                    "as": "asset"
+                    "as": "asset",
                 }
             },
             {"$unwind": "$asset"},
             {"$match": {"asset.asset_type": stat["_id"]}},
-            {"$group": {"_id": "$asset_id"}}
+            {"$group": {"_id": "$asset_id"}},
         ]
         unique_assets = list(db.transactions.aggregate(unique_assets_pipeline))
         all_unique_assets.update(asset["_id"] for asset in unique_assets)
@@ -197,18 +194,24 @@ async def get_asset_type_percentages(
     asset_type_breakdown = []
     for stat in asset_type_stats:
         asset_type = stat["_id"]
-        percentage = (stat["total_value"] / total_portfolio_value * 100) if total_portfolio_value > 0 else 0.0
-        
-        asset_type_breakdown.append(AssetTypePercentage(
-            asset_type=asset_type,
-            percentage=round(percentage, 2),
-            total_value=round(stat["total_value"], 2),
-            transaction_count=stat["transaction_count"]
-        ))
+        percentage = (
+            (stat["total_value"] / total_portfolio_value * 100)
+            if total_portfolio_value > 0
+            else 0.0
+        )
+
+        asset_type_breakdown.append(
+            AssetTypePercentage(
+                asset_type=asset_type,
+                percentage=round(percentage, 2),
+                total_value=round(stat["total_value"], 2),
+                transaction_count=stat["transaction_count"],
+            )
+        )
 
     return UserAssetStatistics(
         total_portfolio_value=round(total_portfolio_value, 2),
         asset_type_breakdown=asset_type_breakdown,
         total_transactions=total_transactions,
-        unique_assets=len(all_unique_assets)
+        unique_assets=len(all_unique_assets),
     )

@@ -334,14 +334,14 @@ class TestGetAssetTypePercentages:
                 "_id": "stock",
                 "total_value": 10000.0,
                 "transaction_count": 5,
-                "unique_assets": [asset_id_1]
+                "unique_assets": [asset_id_1],
             },
             {
                 "_id": "bond",
                 "total_value": 5000.0,
                 "transaction_count": 3,
-                "unique_assets": [asset_id_2]
-            }
+                "unique_assets": [asset_id_2],
+            },
         ]
 
         # Mock unique assets aggregation results
@@ -369,7 +369,7 @@ class TestGetAssetTypePercentages:
 
             # Check asset type breakdown
             assert len(data["asset_type_breakdown"]) == 2
-            
+
             # Stock should be first (higher value)
             stock_breakdown = data["asset_type_breakdown"][0]
             assert stock_breakdown["asset_type"] == "stock"
@@ -436,7 +436,7 @@ class TestGetAssetTypePercentages:
                 "_id": "stock",
                 "total_value": 10000.0,
                 "transaction_count": 5,
-                "unique_assets": [asset_id]
+                "unique_assets": [asset_id],
             }
         ]
         mock_unique_assets = [{"_id": asset_id}]
@@ -477,7 +477,7 @@ class TestGetAssetTypePercentages:
                 "_id": "stock",
                 "total_value": 0.0,
                 "transaction_count": 0,
-                "unique_assets": []
+                "unique_assets": [],
             }
         ]
 
@@ -516,7 +516,7 @@ class TestGetAssetTypePercentages:
                 "_id": "stock",
                 "total_value": 15000.0,
                 "transaction_count": 8,
-                "unique_assets": [asset_id]
+                "unique_assets": [asset_id],
             }
         ]
         mock_unique_assets = [{"_id": asset_id}]
@@ -599,7 +599,9 @@ class TestGetAssetTypePercentages:
             expected_query = {"$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}
             mock_db.wallets.find.assert_called_with(expected_query, {"_id": 1})
 
-    def test_get_asset_type_percentages_verifies_aggregation_pipeline(self, client, mock_db):
+    def test_get_asset_type_percentages_verifies_aggregation_pipeline(
+        self, client, mock_db
+    ):
         """Test that the correct aggregation pipeline is used."""
         user_id = ObjectId("507f1f77bcf86cd799439011")
         wallet_ids = [ObjectId("507f1f77bcf86cd799439021")]
@@ -622,7 +624,7 @@ class TestGetAssetTypePercentages:
                         "from": "assets",
                         "localField": "asset_id",
                         "foreignField": "_id",
-                        "as": "asset"
+                        "as": "asset",
                     }
                 },
                 {"$unwind": "$asset"},
@@ -631,15 +633,11 @@ class TestGetAssetTypePercentages:
                         "_id": "$asset.asset_type",
                         "total_value": {"$sum": "$transaction_amount"},
                         "transaction_count": {"$sum": 1},
-                        "unique_assets": {"$addToSet": "$asset_id"}
+                        "unique_assets": {"$addToSet": "$asset_id"},
                     }
                 },
-                {
-                    "$addFields": {
-                        "unique_assets": {"$size": "$unique_assets"}
-                    }
-                },
-                {"$sort": {"total_value": -1}}
+                {"$addFields": {"unique_assets": {"$size": "$unique_assets"}}},
+                {"$sort": {"total_value": -1}},
             ]
             mock_db.transactions.aggregate.assert_called_with(expected_pipeline)
 
@@ -683,14 +681,14 @@ class TestGetAssetTypePercentages:
                 "_id": "stock",
                 "total_value": 1000.0,
                 "transaction_count": 1,
-                "unique_assets": [asset_id]
+                "unique_assets": [asset_id],
             },
             {
                 "_id": "bond",
                 "total_value": 333.33,
                 "transaction_count": 1,
-                "unique_assets": [asset_id]
-            }
+                "unique_assets": [asset_id],
+            },
         ]
         mock_unique_assets = [{"_id": asset_id}]
 
@@ -712,9 +710,13 @@ class TestGetAssetTypePercentages:
             # Check that percentages are rounded to 2 decimal places
             stock_breakdown = data["asset_type_breakdown"][0]
             bond_breakdown = data["asset_type_breakdown"][1]
-            
-            assert stock_breakdown["percentage"] == 75.0  # 1000/1333.33 * 100 = 75.000...
-            assert bond_breakdown["percentage"] == 25.0   # 333.33/1333.33 * 100 = 25.000...
+
+            assert (
+                stock_breakdown["percentage"] == 75.0
+            )  # 1000/1333.33 * 100 = 75.000...
+            assert (
+                bond_breakdown["percentage"] == 25.0
+            )  # 333.33/1333.33 * 100 = 25.000...
 
     def test_get_asset_type_percentages_all_asset_types(self, client, mock_db):
         """Test asset type percentages with all supported asset types."""
@@ -722,18 +724,63 @@ class TestGetAssetTypePercentages:
         wallet_id = ObjectId("507f1f77bcf86cd799439021")
 
         mock_wallets = [{"_id": wallet_id}]
-        
+
         # Mock all asset types from the enum
         mock_asset_stats = [
-            {"_id": "stock", "total_value": 1000.0, "transaction_count": 1, "unique_assets": []},
-            {"_id": "bond", "total_value": 800.0, "transaction_count": 1, "unique_assets": []},
-            {"_id": "etf", "total_value": 600.0, "transaction_count": 1, "unique_assets": []},
-            {"_id": "managed mutual fund", "total_value": 400.0, "transaction_count": 1, "unique_assets": []},
-            {"_id": "real_estate", "total_value": 200.0, "transaction_count": 1, "unique_assets": []},
-            {"_id": "cryptocurrency", "total_value": 100.0, "transaction_count": 1, "unique_assets": []},
-            {"_id": "commodity", "total_value": 50.0, "transaction_count": 1, "unique_assets": []},
-            {"_id": "cash", "total_value": 25.0, "transaction_count": 1, "unique_assets": []},
-            {"_id": "other", "total_value": 10.0, "transaction_count": 1, "unique_assets": []},
+            {
+                "_id": "stock",
+                "total_value": 1000.0,
+                "transaction_count": 1,
+                "unique_assets": [],
+            },
+            {
+                "_id": "bond",
+                "total_value": 800.0,
+                "transaction_count": 1,
+                "unique_assets": [],
+            },
+            {
+                "_id": "etf",
+                "total_value": 600.0,
+                "transaction_count": 1,
+                "unique_assets": [],
+            },
+            {
+                "_id": "managed mutual fund",
+                "total_value": 400.0,
+                "transaction_count": 1,
+                "unique_assets": [],
+            },
+            {
+                "_id": "real_estate",
+                "total_value": 200.0,
+                "transaction_count": 1,
+                "unique_assets": [],
+            },
+            {
+                "_id": "cryptocurrency",
+                "total_value": 100.0,
+                "transaction_count": 1,
+                "unique_assets": [],
+            },
+            {
+                "_id": "commodity",
+                "total_value": 50.0,
+                "transaction_count": 1,
+                "unique_assets": [],
+            },
+            {
+                "_id": "cash",
+                "total_value": 25.0,
+                "transaction_count": 1,
+                "unique_assets": [],
+            },
+            {
+                "_id": "other",
+                "total_value": 10.0,
+                "transaction_count": 1,
+                "unique_assets": [],
+            },
         ]
 
         with patch(
@@ -742,7 +789,7 @@ class TestGetAssetTypePercentages:
             mock_db.wallets.find.return_value = mock_wallets
             mock_db.transactions.aggregate.side_effect = [
                 mock_asset_stats,
-                *([[]] * 9)  # Empty unique assets for each type
+                *([[]] * 9),  # Empty unique assets for each type
             ]
 
             response = client.get("/api/stats/asset-types")
@@ -755,7 +802,18 @@ class TestGetAssetTypePercentages:
             assert data["unique_assets"] == 0
 
             # Verify all asset types are present and sorted by value
-            asset_types = [breakdown["asset_type"] for breakdown in data["asset_type_breakdown"]]
-            expected_order = ["stock", "bond", "etf", "managed mutual fund", "real_estate", 
-                           "cryptocurrency", "commodity", "cash", "other"]
+            asset_types = [
+                breakdown["asset_type"] for breakdown in data["asset_type_breakdown"]
+            ]
+            expected_order = [
+                "stock",
+                "bond",
+                "etf",
+                "managed mutual fund",
+                "real_estate",
+                "cryptocurrency",
+                "commodity",
+                "cash",
+                "other",
+            ]
             assert asset_types == expected_order
