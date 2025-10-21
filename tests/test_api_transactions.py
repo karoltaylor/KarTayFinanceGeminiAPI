@@ -92,16 +92,7 @@ def client():
     return TestClient(app)
 
 
-@pytest.fixture
-def auth_headers():
-    """Get authentication headers for test user."""
-    return {"X-User-ID": "507f1f77bcf86cd799439011"}
-
-
-@pytest.fixture
-def auth_headers_user2():
-    """Get authentication headers for second test user."""
-    return {"X-User-ID": "507f1f77bcf86cd799439012"}
+# Auth headers are now provided by conftest.py fixtures
 
 
 def _create_wallet_and_get_id(client: TestClient, headers: dict, name: str, description: str = "Test") -> str:
@@ -180,6 +171,13 @@ class TestTransactionUpload:
                     "wallet_id": wallet_id
                 }
             )
+        
+        # Debug output
+        if response.status_code != 200:
+            print(f"\n[DEBUG] Response status: {response.status_code}")
+            print(f"[DEBUG] Response body: {response.text[:500]}")
+            print(f"[DEBUG] Request headers: {auth_headers}")
+            print(f"[DEBUG] Wallet ID: {wallet_id}")
         
         assert response.status_code == 200
         data = response.json()
@@ -300,6 +298,10 @@ class TestTransactionUpload:
     
     def test_upload_without_authentication(self, client, sample_csv_file):
         """Test upload without authentication fails."""
+        # Temporarily clear dependency overrides to test actual auth behavior
+        from api.main import app
+        app.dependency_overrides.clear()
+        
         with open(sample_csv_file, 'rb') as f:
             response = client.post(
                 "/api/transactions/upload",
@@ -490,15 +492,9 @@ class TestTransactionList:
                 }
             )
         
-        # Get wallet IDs
-        wallet_a = test_db.wallets.find_one({"name": "Wallet A"})
-        wallet_b = test_db.wallets.find_one({"name": "Wallet B"})
-        assert wallet_a is not None
-        assert wallet_b is not None
-        
-        # Filter by Wallet A
+        # Filter by Wallet A (use the ID we already have)
         response = client.get(
-            f"/api/transactions?wallet_id={str(wallet_a['_id'])}",
+            f"/api/transactions?wallet_id={wallet_a_id}",
             headers=auth_headers
         )
         
@@ -507,9 +503,8 @@ class TestTransactionList:
         assert data["count"] >= 3
         
         # Verify all transactions belong to Wallet A
-        wallet_a = test_db.wallets.find_one({"name": "Wallet A"})
         for tx in data["transactions"]:
-            assert str(tx["wallet_id"]) == str(wallet_a["_id"])
+            assert str(tx["wallet_id"]) == wallet_a_id
     
     def test_list_transactions_pagination(self, client, test_db, auth_headers, sample_csv_file):
         """Test pagination with limit and skip parameters."""
@@ -551,7 +546,7 @@ class TestTransactionList:
         tx2_ids = {tx["_id"] for tx in data2["transactions"]}
         assert tx1_ids.isdisjoint(tx2_ids)
     
-    def test_list_transactions_user_isolation(self, client, test_db, auth_headers, auth_headers_user2, sample_csv_file):
+    def test_list_transactions_user_isolation(self, client, test_db, auth_headers, auth_headers_user2, sample_csv_file, override_auth_user2):
         """Test that users can only see their own transactions."""
         # User 1 uploads transactions
         wallet1_id = _create_wallet_and_get_id(client, auth_headers, "User1 Wallet")
@@ -565,6 +560,13 @@ class TestTransactionList:
                 }
             )
         
+        # Switch to user 2
+        from api.main import app
+        from api.dependencies import get_current_user
+        from src.auth.firebase_auth import get_current_user_from_token
+        app.dependency_overrides[get_current_user] = override_auth_user2
+        app.dependency_overrides[get_current_user_from_token] = override_auth_user2
+        
         # User 2 uploads transactions
         wallet2_id = _create_wallet_and_get_id(client, auth_headers_user2, "User2 Wallet")
         with open(sample_csv_file, 'rb') as f:
@@ -577,10 +579,22 @@ class TestTransactionList:
                 }
             )
         
+        # Switch back to user 1
+        from bson import ObjectId
+        test_user_id = ObjectId("507f1f77bcf86cd799439011")
+        async def mock_get_user1():
+            return test_user_id
+        app.dependency_overrides[get_current_user] = mock_get_user1
+        app.dependency_overrides[get_current_user_from_token] = mock_get_user1
+        
         # User 1 lists transactions
         response1 = client.get(f"/api/transactions?wallet_id={wallet1_id}", headers=auth_headers)
         assert response1.status_code == 200
         data1 = response1.json()
+        
+        # Switch to user 2 again
+        app.dependency_overrides[get_current_user] = override_auth_user2
+        app.dependency_overrides[get_current_user_from_token] = override_auth_user2
         
         # User 2 lists transactions
         response2 = client.get(f"/api/transactions?wallet_id={wallet2_id}", headers=auth_headers_user2)
@@ -592,18 +606,19 @@ class TestTransactionList:
         tx2_ids = {tx["_id"] for tx in data2["transactions"]}
         assert tx1_ids.isdisjoint(tx2_ids)
         
-        # Verify correct wallet associations
-        wallet1 = test_db.wallets.find_one({"name": "User1 Wallet"})
-        wallet2 = test_db.wallets.find_one({"name": "User2 Wallet"})
-        
+        # Verify correct wallet associations using the IDs we already have
         for tx in data1["transactions"]:
-            assert str(tx["wallet_id"]) == str(wallet1["_id"])
+            assert str(tx["wallet_id"]) == wallet1_id
         
         for tx in data2["transactions"]:
-            assert str(tx["wallet_id"]) == str(wallet2["_id"])
+            assert str(tx["wallet_id"]) == wallet2_id
     
     def test_list_transactions_without_authentication(self, client):
         """Test listing transactions without authentication fails."""
+        # Temporarily clear dependency overrides to test actual auth behavior
+        from api.main import app
+        app.dependency_overrides.clear()
+        
         response = client.get("/api/transactions")
         assert response.status_code == 401
     
@@ -824,10 +839,14 @@ class TestTransactionDelete:
     
     def test_delete_transactions_without_authentication(self, client):
         """Test deleting transactions without authentication."""
+        # Temporarily clear dependency overrides to test actual auth behavior
+        from api.main import app
+        app.dependency_overrides.clear()
+        
         response = client.delete(f"/api/transactions/wallet/{str(ObjectId())}")
         assert response.status_code == 401
     
-    def test_delete_transactions_wallet_owned_by_another_user(self, client, test_db, auth_headers, auth_headers_user2, sample_csv_file):
+    def test_delete_transactions_wallet_owned_by_another_user(self, client, test_db, auth_headers, auth_headers_user2, sample_csv_file, override_auth_user2):
         """Test that user cannot delete transactions from another user's wallet."""
         # User 1 uploads transactions
         wallet1_id = _create_wallet_and_get_id(client, auth_headers, "User1 Protected Wallet")
@@ -840,6 +859,13 @@ class TestTransactionDelete:
                     "wallet_id": wallet1_id,
                 }
             )
+        
+        # Switch to user 2
+        from api.main import app
+        from api.dependencies import get_current_user
+        from src.auth.firebase_auth import get_current_user_from_token
+        app.dependency_overrides[get_current_user] = override_auth_user2
+        app.dependency_overrides[get_current_user_from_token] = override_auth_user2
         
         # User 2 tries to delete User 1's transactions
         response = client.delete(

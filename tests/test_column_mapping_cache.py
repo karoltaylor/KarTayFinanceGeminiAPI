@@ -8,6 +8,9 @@ from datetime import datetime
 from src.services.column_mapper import ColumnMapper
 from src.config.mongodb import MongoDBConfig
 
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def test_user_id():

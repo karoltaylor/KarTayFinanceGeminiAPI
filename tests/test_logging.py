@@ -6,6 +6,9 @@ import json
 from datetime import datetime
 from src.utils.logger import BackendLogger
 
+# Mark all tests in this module as unit tests
+pytestmark = pytest.mark.unit
+
 
 class TestBackendLogger:
     """Test the BackendLogger utility."""

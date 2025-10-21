@@ -12,7 +12,7 @@ from pymongo.database import Database
 from src.config.mongodb import get_db
 from src.pipeline import DataPipeline
 from src.utils.logger import logger
-from src.auth.firebase_auth import get_current_user_from_token
+from api.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 async def upload_transactions(
     file: UploadFile = File(..., description="Transaction file (CSV, TXT, XLS, XLSX)"),
     wallet_id: str = Form(..., description="ID of the wallet to add transactions to"),
-    user_id: ObjectId = Depends(get_current_user_from_token),
+    user_id: ObjectId = Depends(get_current_user),
     db: Database = Depends(get_db),
 ):
     """
@@ -156,7 +156,7 @@ async def upload_transactions(
                     transaction_type="unknown",  # Will be determined from file content
                     asset_type="unknown"  # Will be determined automatically
                 )
-                error_docs.append(error_doc.model_dump(by_alias=True))
+                error_docs.append(error_doc.model_dump(by_alias=True, mode='python'))
             
             db.transaction_errors.insert_many(error_docs)
             errors_count = len(error_docs)
@@ -273,7 +273,7 @@ async def list_transactions(
     limit: Annotated[int, Query(description="Maximum number of transactions to return", ge=1, le=1000)] = 100,
     skip: Annotated[int, Query(description="Number of transactions to skip", ge=0)] = 0,
     db: Database = Depends(get_db),
-    user_id: ObjectId = Depends(get_current_user_from_token),
+    user_id: ObjectId = Depends(get_current_user),
 ):
     """
     List transactions for a specific wallet with pagination.
@@ -372,7 +372,7 @@ async def list_transaction_errors(
     resolved: Annotated[Optional[bool], Query(description="Filter by resolved status")] = None,
     limit: Annotated[int, Query(description="Maximum errors to return", ge=1, le=1000)] = 100,
     skip: Annotated[int, Query(description="Number of errors to skip", ge=0)] = 0,
-    user_id: ObjectId = Depends(get_current_user_from_token),
+    user_id: ObjectId = Depends(get_current_user),
     db: Database = Depends(get_db),
 ):
     """
@@ -434,7 +434,7 @@ async def list_transaction_errors(
 @router.delete("/wallet/{wallet_id}", summary="Delete wallet transactions", response_model=None)
 async def delete_wallet_transactions(
     wallet_id: Annotated[str, PathParam(description="ID of the wallet")],
-    user_id: ObjectId = Depends(get_current_user_from_token),
+    user_id: ObjectId = Depends(get_current_user),
     db: Database = Depends(get_db)
 ):
     """

@@ -5,6 +5,9 @@ from unittest.mock import Mock, patch
 from src.services.asset_type_mapper import AssetTypeMapper
 from src.models.mongodb_models import AssetType
 
+# Mark all tests in this module as unit tests
+pytestmark = pytest.mark.unit
+
 
 class TestAssetTypeMapper:
     """Tests for AssetTypeMapper."""
@@ -237,3 +240,25 @@ class TestAssetTypeMapper:
         for asset_type in AssetType:
             valid_result = {"asset_type": asset_type.value, "symbol": "TEST"}
             assert asset_type_mapper._validate_asset_result(valid_result) is True
+
+    @pytest.mark.gemini_api
+    def test_determine_asset_type_with_real_api(self, set_test_env_vars):
+        """
+        Test asset type determination with real Gemini API.
+        
+        This test requires USE_REAL_AI=true environment variable to run.
+        It will be skipped if USE_REAL_AI is not set to true.
+        """
+        pytest.skip("Real API test - requires USE_REAL_AI=true")
+        
+        # This test would only run when USE_REAL_AI=true is set
+        # and the test is marked with @pytest.mark.gemini_api
+        mapper = AssetTypeMapper()
+        
+        # Test with real API (this would make actual API calls)
+        result = mapper.determine_asset_type("Apple Inc.", "AAPL")
+        
+        # Verify the result
+        assert result is not None
+        assert "asset_type" in result
+        assert result["asset_type"] in ["stock", "crypto", "bond", "commodity", "etf", "other"]

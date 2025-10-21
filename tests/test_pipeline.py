@@ -1,11 +1,15 @@
 """Tests for data pipeline."""
 
+import pytest
 import pandas as pd
 from unittest.mock import patch, MagicMock
 
 from src.pipeline.data_pipeline import DataPipeline
 from src.models import TransactionType, AssetType
 from bson import ObjectId
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
 
 
 class TestDataPipeline:

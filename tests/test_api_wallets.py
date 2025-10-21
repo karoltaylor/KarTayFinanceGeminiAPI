@@ -92,10 +92,7 @@ def client():
     return TestClient(app)
 
 
-@pytest.fixture
-def auth_headers(test_user_id):
-    """Authentication headers with test user ID."""
-    return {"X-User-ID": test_user_id}
+# Auth headers are now provided by conftest.py fixtures
 
 
 class TestListWallets:
@@ -176,17 +173,27 @@ class TestListWallets:
 
     def test_list_wallets_without_auth(self, client):
         """Test that listing wallets without auth header fails."""
+        # Temporarily clear dependency overrides to test actual auth behavior
+        from api.main import app
+        app.dependency_overrides.clear()
+        
         response = client.get("/api/wallets")
         
         assert response.status_code == 401  # Unauthorized (missing authentication)
 
     def test_list_wallets_invalid_user_id(self, client):
         """Test that invalid user ID in header fails."""
-        headers = {"X-User-ID": "invalid-id"}
+        # Temporarily clear dependency overrides to test actual auth behavior
+        from api.main import app
+        app.dependency_overrides.clear()
+        
+        headers = {"Authorization": "Bearer invalid-token"}
         response = client.get("/api/wallets", headers=headers)
         
         assert response.status_code == 401
-        assert "Invalid X-User-ID format" in response.json()["detail"]
+        # Check that error message contains authentication-related text
+        detail = response.json()["detail"]
+        assert any(word in detail.lower() for word in ["authentication", "invalid", "token", "expired"])
 
     def test_list_wallets_only_shows_user_wallets(self, client, auth_headers, test_db, test_user_id):
         """Test that users only see their own wallets."""
@@ -289,6 +296,10 @@ class TestCreateWallet:
 
     def test_create_wallet_without_auth(self, client):
         """Test that creating wallet without auth fails."""
+        # Temporarily clear dependency overrides to test actual auth behavior
+        from api.main import app
+        app.dependency_overrides.clear()
+        
         wallet_data = {"name": "Unauthorized Wallet"}
         response = client.post("/api/wallets", json=wallet_data)
         
@@ -418,6 +429,10 @@ class TestDeleteWallet:
 
     def test_delete_wallet_without_auth(self, client, test_db, test_user_id):
         """Test that deleting wallet without auth fails."""
+        # Temporarily clear dependency overrides to test actual auth behavior
+        from api.main import app
+        app.dependency_overrides.clear()
+        
         # Create a wallet
         wallet = {
             "user_id": ObjectId(test_user_id),
@@ -480,36 +495,61 @@ class TestWalletEndpointsIntegration:
         response = client.get("/api/wallets", headers=auth_headers)
         assert response.json()["count"] == initial_count
 
-    def test_multiple_users_isolation(self, client, test_db):
+    def test_multiple_users_isolation(self, client, test_db, auth_headers, auth_headers_user2, override_auth_user2):
         """Test that wallet operations are isolated between users."""
-        user1_headers = {"X-User-ID": "507f1f77bcf86cd799439011"}
-        user2_headers = {"X-User-ID": "507f1f77bcf86cd799439012"}
+        from api.main import app
+        from api.dependencies import get_current_user
+        from src.auth.firebase_auth import get_current_user_from_token
+        from bson import ObjectId
         
-        # Get initial counts for both users
-        response1 = client.get("/api/wallets", headers=user1_headers)
+        # User 1 (default) gets initial count
+        response1 = client.get("/api/wallets", headers=auth_headers)
         assert response1.status_code == 200
         user1_initial = response1.json()["count"]
         
-        response2 = client.get("/api/wallets", headers=user2_headers)
+        # Switch to user 2
+        app.dependency_overrides[get_current_user] = override_auth_user2
+        app.dependency_overrides[get_current_user_from_token] = override_auth_user2
+        
+        response2 = client.get("/api/wallets", headers=auth_headers_user2)
         assert response2.status_code == 200
         user2_initial = response2.json()["count"]
         
+        # Switch back to user 1
+        test_user_id = ObjectId("507f1f77bcf86cd799439011")
+        async def mock_get_user1():
+            return test_user_id
+        app.dependency_overrides[get_current_user] = mock_get_user1
+        app.dependency_overrides[get_current_user_from_token] = mock_get_user1
+        
         # User 1 creates a wallet
         wallet_data = {"name": "User 1 Wallet"}
-        response = client.post("/api/wallets", json=wallet_data, headers=user1_headers)
+        response = client.post("/api/wallets", json=wallet_data, headers=auth_headers)
         assert response.status_code == 200
+        
+        # Switch to user 2
+        app.dependency_overrides[get_current_user] = override_auth_user2
+        app.dependency_overrides[get_current_user_from_token] = override_auth_user2
         
         # User 2 creates a wallet with the same name (should succeed - different user)
-        response = client.post("/api/wallets", json=wallet_data, headers=user2_headers)
+        response = client.post("/api/wallets", json=wallet_data, headers=auth_headers_user2)
         assert response.status_code == 200
         
+        # Switch back to user 1
+        app.dependency_overrides[get_current_user] = mock_get_user1
+        app.dependency_overrides[get_current_user_from_token] = mock_get_user1
+        
         # User 1 sees only their wallet
-        response = client.get("/api/wallets", headers=user1_headers)
+        response = client.get("/api/wallets", headers=auth_headers)
         assert response.status_code == 200
         assert response.json()["count"] == user1_initial + 1
         
+        # Switch to user 2
+        app.dependency_overrides[get_current_user] = override_auth_user2
+        app.dependency_overrides[get_current_user_from_token] = override_auth_user2
+        
         # User 2 sees only their wallet
-        response = client.get("/api/wallets", headers=user2_headers)
+        response = client.get("/api/wallets", headers=auth_headers_user2)
         assert response.status_code == 200
         assert response.json()["count"] == user2_initial + 1
 

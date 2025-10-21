@@ -241,7 +241,7 @@ class TransactionMapper:
                     symbol=symbol
                 )
             
-            result = assets_collection.insert_one(asset.model_dump(by_alias=True))
+            result = assets_collection.insert_one(asset.model_dump(by_alias=True, exclude={'id'}, mode='python'))
             asset_id = PyObjectId(result.inserted_id)
             self._asset_cache[cache_key] = asset_id
             return asset_id
@@ -443,7 +443,7 @@ class TransactionMapper:
             return []
 
         # Convert to dicts for MongoDB
-        transaction_dicts = [t.model_dump(by_alias=True) for t in transactions]
+        transaction_dicts = [t.model_dump(by_alias=True, exclude={'id'}, mode='python') for t in transactions]
 
         # Insert into MongoDB
         result = transactions_collection.insert_many(transaction_dicts)

@@ -7,6 +7,9 @@ from src.loaders import FileLoaderFactory
 from src.loaders.csv_loader import CSVLoader
 from src.loaders.excel_loader import ExcelLoader
 
+# Mark all tests in this module as unit tests
+pytestmark = pytest.mark.unit
+
 
 class TestCSVLoader:
     """Tests for CSV loader."""

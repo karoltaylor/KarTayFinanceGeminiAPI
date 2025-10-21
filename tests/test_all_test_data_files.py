@@ -10,6 +10,9 @@ import pandas as pd
 from api.main import app
 from src.config.mongodb import MongoDBConfig
 
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 def _create_wallet_and_get_id(client: TestClient, headers: dict, name: str, description: str = "Test") -> str:
     """Helper to create a wallet and return its _id as string."""
@@ -219,10 +222,7 @@ def client():
     return TestClient(app)
 
 
-@pytest.fixture
-def auth_headers():
-    """Get authentication headers for test user."""
-    return {"X-User-ID": "507f1f77bcf86cd799439011"}
+# Auth headers are now provided by conftest.py fixtures
 
 
 class TestAllTestDataFiles:

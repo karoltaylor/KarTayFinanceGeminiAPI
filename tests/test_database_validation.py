@@ -10,6 +10,9 @@ from src.models.mongodb_models import (
     AssetType, TransactionType, PyObjectId
 )
 
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 class TestUserFieldValidation:
     """Tests for User model field validation."""

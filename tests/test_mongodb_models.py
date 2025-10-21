@@ -15,6 +15,9 @@ from src.models import (
     TransactionRecord,
 )
 
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 class TestWallet:
     """Tests for Wallet model."""

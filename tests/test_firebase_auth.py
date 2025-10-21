@@ -6,15 +6,20 @@ from fastapi import HTTPException
 from src.auth.firebase_auth import verify_firebase_token, get_current_user_from_token
 from bson import ObjectId
 
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 class TestVerifyFirebaseToken:
     """Tests for verify_firebase_token function."""
 
     @pytest.mark.asyncio
-    async def test_no_authorization_header_returns_none(self):
-        """Test that missing authorization header returns None."""
-        result = await verify_firebase_token(None)
-        assert result is None
+    async def test_no_authorization_header_raises_error(self):
+        """Test that missing authorization header raises 401 error."""
+        with pytest.raises(HTTPException) as exc_info:
+            await verify_firebase_token(None)
+        assert exc_info.value.status_code == 401
+        assert "Authentication required" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_invalid_bearer_format_raises_error(self):
@@ -111,7 +116,7 @@ class TestGetCurrentUserFromToken:
             "name": "Test User"
         }
 
-        result = await get_current_user_from_token(firebase_user, None)
+        result = await get_current_user_from_token(firebase_user)
         
         assert result == user_id
         mock_db.users.find_one.assert_called_once_with({"oauth_id": "firebase123"})
@@ -133,48 +138,18 @@ class TestGetCurrentUserFromToken:
             "name": "New User"
         }
 
-        result = await get_current_user_from_token(firebase_user, None)
+        result = await get_current_user_from_token(firebase_user)
         
         assert result == new_user_id
         assert mock_db.users.insert_one.called
 
-    @pytest.mark.asyncio
-    @patch('src.config.mongodb.MongoDBConfig.get_database')
-    async def test_legacy_x_user_id_returns_user(self, mock_get_db):
-        """Test that legacy X-User-ID header works."""
-        # Mock database
-        mock_db = MagicMock()
-        user_id = ObjectId()
-        mock_db.users.find_one.return_value = {"_id": user_id, "is_active": True}
-        mock_get_db.return_value = mock_db
-
-        result = await get_current_user_from_token(None, str(user_id))
-        
-        assert result == user_id
+    # Legacy X-User-ID tests removed - Firebase tokens only now
 
     @pytest.mark.asyncio
-    @patch('src.config.mongodb.MongoDBConfig.get_database')
-    async def test_legacy_x_user_id_inactive_user_raises_error(self, mock_get_db):
-        """Test that inactive user with X-User-ID raises 401."""
-        # Mock database
-        mock_db = MagicMock()
-        user_id = ObjectId()
-        mock_db.users.find_one.return_value = None
-        mock_get_db.return_value = mock_db
-
+    async def test_no_authentication_raises_error(self):
+        """Test that missing Firebase token raises 401."""
         with pytest.raises(HTTPException) as exc_info:
-            await get_current_user_from_token(None, str(user_id))
-        assert exc_info.value.status_code == 401
-
-    @pytest.mark.asyncio
-    @patch('src.config.mongodb.MongoDBConfig.get_database')
-    async def test_no_authentication_raises_error(self, mock_get_db):
-        """Test that missing both auth methods raises 401."""
-        mock_db = MagicMock()
-        mock_get_db.return_value = mock_db
-
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user_from_token(None, None)
+            await verify_firebase_token(None)
         assert exc_info.value.status_code == 401
         assert "Authentication required" in exc_info.value.detail
 
@@ -198,7 +173,7 @@ class TestGetCurrentUserFromToken:
             "name": "Test User"
         }
 
-        result = await get_current_user_from_token(firebase_user, None)
+        result = await get_current_user_from_token(firebase_user)
         
         assert result == new_user_id
         # Should create user with username "test_1" due to collision

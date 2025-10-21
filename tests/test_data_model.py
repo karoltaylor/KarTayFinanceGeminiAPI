@@ -6,6 +6,9 @@ import pandas as pd
 
 from src.models.data_model import TransactionRecord, FinancialDataModel
 
+# Mark all tests in this module as unit tests
+pytestmark = pytest.mark.unit
+
 
 class TestTransactionRecord:
     """Tests for TransactionRecord model."""

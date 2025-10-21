@@ -1,8 +1,12 @@
 """Tests for table detection service."""
 
 import pandas as pd
+import pytest
 
 from src.services.table_detector import TableDetector
+
+# Mark all tests in this module as unit tests
+pytestmark = pytest.mark.unit
 
 
 class TestTableDetector:

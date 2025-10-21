@@ -4,6 +4,9 @@ import pytest
 
 from src.config.settings import Settings
 
+# Mark all tests in this module as unit tests
+pytestmark = pytest.mark.unit
+
 
 class TestSettings:
     """Tests for Settings class."""

@@ -126,7 +126,7 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
             oauth_id=user_data.oauth_id,
         )
         
-        user_dict = user.model_dump(by_alias=True, exclude={"id"})
+        user_dict = user.model_dump(by_alias=True, exclude={"id"}, mode='python')
         result = db.users.insert_one(user_dict)
         
         return {

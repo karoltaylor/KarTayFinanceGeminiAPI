@@ -13,6 +13,9 @@ from src.models import (
     AssetType,
     PyObjectId,
 )
+
+# Mark all tests in this module as unit tests
+pytestmark = pytest.mark.unit
 from bson import ObjectId
 
 

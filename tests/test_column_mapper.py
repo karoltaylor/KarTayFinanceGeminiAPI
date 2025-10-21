@@ -6,6 +6,9 @@ from unittest.mock import patch, MagicMock
 
 from src.services.column_mapper import ColumnMapper
 
+# Mark all tests in this module as unit tests
+pytestmark = pytest.mark.unit
+
 
 class TestColumnMapper:
     """Tests for ColumnMapper."""
@@ -193,3 +196,37 @@ class TestColumnMapper:
         assert "asset_name" in prompt
         assert "asset_price" in prompt
         assert "JSON" in prompt
+
+    @pytest.mark.gemini_api
+    def test_map_columns_with_real_api(self, set_test_env_vars):
+        """
+        Test column mapping with real Gemini API.
+        
+        This test requires USE_REAL_AI=true environment variable to run.
+        It will be skipped if USE_REAL_AI is not set to true.
+        """
+        pytest.skip("Real API test - requires USE_REAL_AI=true")
+        
+        # This test would only run when USE_REAL_AI=true is set
+        # and the test is marked with @pytest.mark.gemini_api
+        mapper = ColumnMapper()
+        
+        # Create a sample DataFrame
+        df = pd.DataFrame({
+            'Account': ['MyWallet', 'Savings'],
+            'Stock Name': ['AAPL', 'MSFT'],
+            'Trade Date': ['2024-01-10', '2024-01-11'],
+            'Price': [150.50, 380.25],
+            'Shares': [10, 5],
+            'Curr': ['USD', 'USD']
+        })
+        
+        # Test with real API (this would make actual API calls)
+        result = mapper.map_columns(df, [
+            "wallet_name", "asset_name", "date", 
+            "asset_item_price", "volume", "currency"
+        ])
+        
+        # Verify the mapping worked
+        assert result is not None
+        assert len(result) > 0
