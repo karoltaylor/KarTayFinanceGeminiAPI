@@ -1,7 +1,6 @@
 """Application settings and configuration."""
 
 import os
-from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -15,7 +14,7 @@ def _get_active_env_file():
             env_file = marker_file.read_text().strip()
             if env_file and Path(env_file).exists():
                 return env_file
-        except:
+        except Exception:
             pass
 
     # Fallback to ENV_FILE environment variable or .env

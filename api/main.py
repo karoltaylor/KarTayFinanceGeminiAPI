@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
         MongoDBConfig.initialize_collections()
         print("[OK] MongoDB connected and initialized")
     except Exception as e:
-        print(f"[ERROR] MongoDB initialization failed!")
+        print("[ERROR] MongoDB initialization failed!")
         print(f"[ERROR] Exception type: {type(e).__name__}")
         print(f"[ERROR] Exception message: {str(e)}")
         import traceback

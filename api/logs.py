@@ -1,6 +1,6 @@
 """Logging endpoints for centralized file-based logging."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from datetime import datetime, UTC

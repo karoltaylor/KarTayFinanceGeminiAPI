@@ -90,7 +90,7 @@ async def upload_transactions(
     )
     if not wallet:
         raise HTTPException(
-            status_code=404, detail=f"Wallet not found or you don't have access to it"
+            status_code=404, detail="Wallet not found or you don't have access to it"
         )
 
     # Log transaction upload start

@@ -3,10 +3,8 @@
 import os
 from typing import Optional, Dict, Any
 from fastapi import Header, HTTPException, Depends
-from src.config.mongodb import get_db
 from firebase_admin import auth, credentials, initialize_app
 from bson import ObjectId
-from pymongo.database import Database
 
 # Firebase initialization state
 _firebase_initialized = False

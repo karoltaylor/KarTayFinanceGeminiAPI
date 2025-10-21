@@ -17,7 +17,7 @@ def _get_active_env_file():
             env_file = marker_file.read_text().strip()
             if env_file and Path(env_file).exists():
                 return env_file
-        except:
+        except Exception:
             pass
 
     # Fallback to ENV_FILE environment variable or .env
@@ -129,7 +129,7 @@ class MongoDBConfig:
 
             # PyMongo 4.x handles SSL/TLS automatically for mongodb+srv://
             # Just set a reasonable timeout
-            print(f"[DEBUG] Creating MongoClient with timeout=10000ms...")
+            print("[DEBUG] Creating MongoClient with timeout=10000ms...")
             try:
                 cls._client = MongoClient(url, serverSelectionTimeoutMS=10000)
                 print("[DEBUG] MongoClient created successfully")

@@ -7,8 +7,6 @@ from ..loaders import FileLoaderFactory
 from ..services import ColumnMapper, TransactionMapper
 from ..models import (
     Transaction,
-    TransactionType,
-    AssetType,
     PyObjectId,
 )
 from ..config.settings import Settings

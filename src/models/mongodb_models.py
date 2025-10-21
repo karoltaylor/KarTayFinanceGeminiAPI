@@ -1,6 +1,6 @@
 """MongoDB data models for financial tracking system."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional, List, Dict
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, ConfigDict

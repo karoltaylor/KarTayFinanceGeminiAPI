@@ -1,11 +1,8 @@
 """Shared dependencies for API endpoints."""
 
-from typing import Optional, Dict, Any
-from fastapi import Depends, Header, HTTPException
+from typing import Dict, Any
+from fastapi import Depends
 from bson import ObjectId
-from pymongo.database import Database
-
-from src.config.mongodb import get_db
 from src.auth.firebase_auth import verify_firebase_token, get_current_user_from_token
 
 
