@@ -52,11 +52,16 @@ GET    /api/transactions/errors        # List upload errors
 DELETE /api/transactions/wallet/{id}   # Delete all transactions
 ```
 
+### Statistics
+```
+GET /api/stats              # User statistics (basic)
+GET /api/stats/asset-types  # Asset type percentage breakdown
+```
+
 ### Other
 ```
 GET /health                 # Health check
 GET /api/assets             # List all assets
-GET /api/stats              # User statistics
 GET /docs                   # API documentation (Swagger)
 ```
 
