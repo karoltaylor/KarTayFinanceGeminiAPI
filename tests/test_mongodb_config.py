@@ -305,7 +305,16 @@ class TestLoadEnvOnce:
             return_value="config/config.dev.env",
         ), patch("builtins.open", mock_open(read_data=env_content)), patch(
             "src.config.mongodb.load_dotenv"
-        ):
+        ), patch("src.config.mongodb.os.getenv") as mock_getenv:
+            # Mock CI environment variables to be False
+            mock_getenv.side_effect = lambda key, default=None: {
+                'AWS_LAMBDA_FUNCTION_NAME': None,
+                'GITHUB_ACTIONS': None,
+                'CI': None,
+                'CONTINUOUS_INTEGRATION': None,
+                'JENKINS_URL': None,
+                'BUILD_NUMBER': None,
+            }.get(key, default)
 
             env_vars = _load_env_once()
 
@@ -314,7 +323,17 @@ class TestLoadEnvOnce:
 
     def test_load_env_once_no_file(self):
         """Test environment loading when no file exists."""
-        with patch("src.config.mongodb._get_active_env_file", return_value=None):
+        with patch("src.config.mongodb._get_active_env_file", return_value=None), patch("src.config.mongodb.os.getenv") as mock_getenv:
+            # Mock CI environment variables to be False
+            mock_getenv.side_effect = lambda key, default=None: {
+                'AWS_LAMBDA_FUNCTION_NAME': None,
+                'GITHUB_ACTIONS': None,
+                'CI': None,
+                'CONTINUOUS_INTEGRATION': None,
+                'JENKINS_URL': None,
+                'BUILD_NUMBER': None,
+            }.get(key, default)
+
             env_vars = _load_env_once()
 
             assert env_vars == {}
@@ -324,7 +343,16 @@ class TestLoadEnvOnce:
         with patch(
             "src.config.mongodb._get_active_env_file",
             return_value="config/config.dev.env",
-        ), patch("builtins.open", side_effect=FileNotFoundError("File not found")):
+        ), patch("builtins.open", side_effect=FileNotFoundError("File not found")), patch("src.config.mongodb.os.getenv") as mock_getenv:
+            # Mock CI environment variables to be False
+            mock_getenv.side_effect = lambda key, default=None: {
+                'AWS_LAMBDA_FUNCTION_NAME': None,
+                'GITHUB_ACTIONS': None,
+                'CI': None,
+                'CONTINUOUS_INTEGRATION': None,
+                'JENKINS_URL': None,
+                'BUILD_NUMBER': None,
+            }.get(key, default)
 
             env_vars = _load_env_once()
 
@@ -335,7 +363,16 @@ class TestLoadEnvOnce:
         with patch(
             "src.config.mongodb._get_active_env_file",
             return_value="config/config.dev.env",
-        ), patch("builtins.open", mock_open(read_data="")):
+        ), patch("builtins.open", mock_open(read_data="")), patch("src.config.mongodb.os.getenv") as mock_getenv:
+            # Mock CI environment variables to be False
+            mock_getenv.side_effect = lambda key, default=None: {
+                'AWS_LAMBDA_FUNCTION_NAME': None,
+                'GITHUB_ACTIONS': None,
+                'CI': None,
+                'CONTINUOUS_INTEGRATION': None,
+                'JENKINS_URL': None,
+                'BUILD_NUMBER': None,
+            }.get(key, default)
 
             env_vars = _load_env_once()
 
@@ -350,7 +387,16 @@ class TestLoadEnvOnce:
             return_value="config/config.dev.env",
         ), patch("builtins.open", mock_open(read_data=env_content)), patch(
             "src.config.mongodb.load_dotenv"
-        ):
+        ), patch("src.config.mongodb.os.getenv") as mock_getenv:
+            # Mock CI environment variables to be False
+            mock_getenv.side_effect = lambda key, default=None: {
+                'AWS_LAMBDA_FUNCTION_NAME': None,
+                'GITHUB_ACTIONS': None,
+                'CI': None,
+                'CONTINUOUS_INTEGRATION': None,
+                'JENKINS_URL': None,
+                'BUILD_NUMBER': None,
+            }.get(key, default)
 
             env_vars = _load_env_once()
 
@@ -369,7 +415,16 @@ class TestLoadEnvOnce:
             return_value="config/config.dev.env",
         ), patch("builtins.open", mock_open(read_data=env_content)), patch(
             "src.config.mongodb.load_dotenv"
-        ):
+        ), patch("src.config.mongodb.os.getenv") as mock_getenv:
+            # Mock CI environment variables to be False
+            mock_getenv.side_effect = lambda key, default=None: {
+                'AWS_LAMBDA_FUNCTION_NAME': None,
+                'GITHUB_ACTIONS': None,
+                'CI': None,
+                'CONTINUOUS_INTEGRATION': None,
+                'JENKINS_URL': None,
+                'BUILD_NUMBER': None,
+            }.get(key, default)
 
             env_vars = _load_env_once()
 
@@ -387,7 +442,16 @@ class TestLoadEnvOnce:
             return_value="config/config.dev.env",
         ), patch("builtins.open", mock_open(read_data=env_content)), patch(
             "src.config.mongodb.load_dotenv"
-        ):
+        ), patch("src.config.mongodb.os.getenv") as mock_getenv:
+            # Mock CI environment variables to be False
+            mock_getenv.side_effect = lambda key, default=None: {
+                'AWS_LAMBDA_FUNCTION_NAME': None,
+                'GITHUB_ACTIONS': None,
+                'CI': None,
+                'CONTINUOUS_INTEGRATION': None,
+                'JENKINS_URL': None,
+                'BUILD_NUMBER': None,
+            }.get(key, default)
 
             env_vars = _load_env_once()
 
@@ -405,7 +469,16 @@ class TestLoadEnvOnce:
             return_value="config/config.dev.env",
         ), patch("builtins.open", mock_open(read_data=env_content)), patch(
             "src.config.mongodb.load_dotenv"
-        ):
+        ), patch("src.config.mongodb.os.getenv") as mock_getenv:
+            # Mock CI environment variables to be False
+            mock_getenv.side_effect = lambda key, default=None: {
+                'AWS_LAMBDA_FUNCTION_NAME': None,
+                'GITHUB_ACTIONS': None,
+                'CI': None,
+                'CONTINUOUS_INTEGRATION': None,
+                'JENKINS_URL': None,
+                'BUILD_NUMBER': None,
+            }.get(key, default)
 
             env_vars = _load_env_once()
 
