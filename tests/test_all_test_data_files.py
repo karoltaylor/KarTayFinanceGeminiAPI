@@ -198,13 +198,30 @@ def test_db(unique_test_email, unique_test_username):
     test_user_id = ObjectId("507f1f77bcf86cd799439011")
 
     # Clean up test data before each test
-    db.transactions.delete_many({})
+    db.transactions.delete_many(
+        {"$or": [{"user_id": test_user_id}, {"user_id": str(test_user_id)}]}
+    )
     db.wallets.delete_many(
         {"$or": [{"user_id": test_user_id}, {"user_id": str(test_user_id)}]}
     )
-    db.assets.delete_many({})
+    # Only delete assets that are referenced by test transactions
+    test_wallet_ids = [
+        w["_id"]
+        for w in db.wallets.find(
+            {"$or": [{"user_id": test_user_id}, {"user_id": str(test_user_id)}]}
+        )
+    ]
+    if test_wallet_ids:
+        test_asset_ids = [
+            t["asset_id"]
+            for t in db.transactions.find({"wallet_id": {"$in": test_wallet_ids}})
+        ]
+        if test_asset_ids:
+            db.assets.delete_many({"_id": {"$in": test_asset_ids}})
     db.users.delete_many({"_id": test_user_id})
-    db.transaction_errors.delete_many({})
+    db.transaction_errors.delete_many(
+        {"$or": [{"user_id": test_user_id}, {"user_id": str(test_user_id)}]}
+    )
 
     # Create test user with unique email
     test_user = {
@@ -222,13 +239,30 @@ def test_db(unique_test_email, unique_test_username):
     yield db
 
     # Clean up test data after each test
-    db.transactions.delete_many({})
+    db.transactions.delete_many(
+        {"$or": [{"user_id": test_user_id}, {"user_id": str(test_user_id)}]}
+    )
     db.wallets.delete_many(
         {"$or": [{"user_id": test_user_id}, {"user_id": str(test_user_id)}]}
     )
-    db.assets.delete_many({})
+    # Only delete assets that are referenced by test transactions
+    test_wallet_ids = [
+        w["_id"]
+        for w in db.wallets.find(
+            {"$or": [{"user_id": test_user_id}, {"user_id": str(test_user_id)}]}
+        )
+    ]
+    if test_wallet_ids:
+        test_asset_ids = [
+            t["asset_id"]
+            for t in db.transactions.find({"wallet_id": {"$in": test_wallet_ids}})
+        ]
+        if test_asset_ids:
+            db.assets.delete_many({"_id": {"$in": test_asset_ids}})
     db.users.delete_many({"_id": test_user_id})
-    db.transaction_errors.delete_many({})
+    db.transaction_errors.delete_many(
+        {"$or": [{"user_id": test_user_id}, {"user_id": str(test_user_id)}]}
+    )
 
 
 @pytest.fixture

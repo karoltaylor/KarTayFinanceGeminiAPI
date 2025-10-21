@@ -26,16 +26,32 @@ def test_db(test_user_id):
     # Clean up before test
     db.column_mapping_cache.delete_many({"user_id": test_user_id})
     db.wallets.delete_many({"user_id": test_user_id})
-    db.assets.delete_many({})
-    db.transactions.delete_many({})
+    # Only delete assets that are referenced by test transactions
+    test_wallet_ids = [w["_id"] for w in db.wallets.find({"user_id": test_user_id})]
+    if test_wallet_ids:
+        test_asset_ids = [
+            t["asset_id"]
+            for t in db.transactions.find({"wallet_id": {"$in": test_wallet_ids}})
+        ]
+        if test_asset_ids:
+            db.assets.delete_many({"_id": {"$in": test_asset_ids}})
+    db.transactions.delete_many({"user_id": test_user_id})
 
     yield db
 
     # Clean up after test
     db.column_mapping_cache.delete_many({"user_id": test_user_id})
     db.wallets.delete_many({"user_id": test_user_id})
-    db.assets.delete_many({})
-    db.transactions.delete_many({})
+    # Only delete assets that are referenced by test transactions
+    test_wallet_ids = [w["_id"] for w in db.wallets.find({"user_id": test_user_id})]
+    if test_wallet_ids:
+        test_asset_ids = [
+            t["asset_id"]
+            for t in db.transactions.find({"wallet_id": {"$in": test_wallet_ids}})
+        ]
+        if test_asset_ids:
+            db.assets.delete_many({"_id": {"$in": test_asset_ids}})
+    db.transactions.delete_many({"user_id": test_user_id})
 
 
 @pytest.fixture
