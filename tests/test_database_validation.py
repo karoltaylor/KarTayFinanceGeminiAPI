@@ -6,8 +6,15 @@ from bson import ObjectId
 from pydantic import ValidationError
 
 from src.models.mongodb_models import (
-    User, Wallet, Asset, AssetCurrentValue, Transaction, TransactionError,
-    AssetType, TransactionType, PyObjectId
+    User,
+    Wallet,
+    Asset,
+    AssetCurrentValue,
+    Transaction,
+    TransactionError,
+    AssetType,
+    TransactionType,
+    PyObjectId,
 )
 
 # Mark all tests in this module as integration tests
@@ -23,15 +30,11 @@ class TestUserFieldValidation:
             "user@example.com",
             "test.user@domain.co.uk",
             "user+tag@example.org",
-            "123@test.com"
+            "123@test.com",
         ]
-        
+
         for email in valid_emails:
-            user = User(
-                email=email,
-                username="testuser",
-                full_name="Test User"
-            )
+            user = User(email=email, username="testuser", full_name="Test User")
             assert user.email == email.lower().strip()
 
     def test_email_validation_invalid_formats(self):
@@ -42,23 +45,17 @@ class TestUserFieldValidation:
             "user@",
             "user@.com",
             "user@domain.",
-            ""  # Removed "user@domain.c" as it's actually valid (single char TLD)
+            "",  # Removed "user@domain.c" as it's actually valid (single char TLD)
         ]
-        
+
         for email in invalid_emails:
             with pytest.raises(ValidationError):
-                User(
-                    email=email,
-                    username="testuser",
-                    full_name="Test User"
-                )
+                User(email=email, username="testuser", full_name="Test User")
 
     def test_email_normalization(self):
         """Test email normalization (lowercase, strip)."""
         user = User(
-            email="  USER@EXAMPLE.COM  ",
-            username="testuser",
-            full_name="Test User"
+            email="  USER@EXAMPLE.COM  ", username="testuser", full_name="Test User"
         )
         assert user.email == "user@example.com"
 
@@ -69,14 +66,12 @@ class TestUserFieldValidation:
             "user123",
             "test_user",
             "user-test",
-            "TestUser123"
+            "TestUser123",
         ]
-        
+
         for username in valid_usernames:
             user = User(
-                email="test@example.com",
-                username=username,
-                full_name="Test User"
+                email="test@example.com", username=username, full_name="Test User"
             )
             assert user.username == username.lower().strip()
 
@@ -88,25 +83,19 @@ class TestUserFieldValidation:
             "user test",  # Contains space
             "user#test",  # Contains #
             "user$test",  # Contains $
-            "ab",         # Too short
-            "a" * 51,     # Too long
-            ""
+            "ab",  # Too short
+            "a" * 51,  # Too long
+            "",
         ]
-        
+
         for username in invalid_usernames:
             with pytest.raises(ValidationError):
-                User(
-                    email="test@example.com",
-                    username=username,
-                    full_name="Test User"
-                )
+                User(email="test@example.com", username=username, full_name="Test User")
 
     def test_username_normalization(self):
         """Test username normalization."""
         user = User(
-            email="test@example.com",
-            username="  TEST_USER  ",
-            full_name="Test User"
+            email="test@example.com", username="  TEST_USER  ", full_name="Test User"
         )
         assert user.username == "test_user"
 
@@ -117,24 +106,16 @@ class TestUserFieldValidation:
             User(
                 email="a" * 256 + "@example.com",
                 username="testuser",
-                full_name="Test User"
+                full_name="Test User",
             )
-        
+
         # Username too long
         with pytest.raises(ValidationError):
-            User(
-                email="test@example.com",
-                username="a" * 51,
-                full_name="Test User"
-            )
-        
+            User(email="test@example.com", username="a" * 51, full_name="Test User")
+
         # Full name too long
         with pytest.raises(ValidationError):
-            User(
-                email="test@example.com",
-                username="testuser",
-                full_name="a" * 201
-            )
+            User(email="test@example.com", username="testuser", full_name="a" * 201)
 
 
 class TestWalletFieldValidation:
@@ -147,61 +128,39 @@ class TestWalletFieldValidation:
             "My Wallet",
             "Investment Portfolio",
             "Savings Account",
-            "Wallet 123"
+            "Wallet 123",
         ]
-        
+
         for name in valid_names:
-            wallet = Wallet(
-                user_id=ObjectId(),
-                name=name,
-                description="Test wallet"
-            )
+            wallet = Wallet(user_id=ObjectId(), name=name, description="Test wallet")
             assert wallet.name == name.strip()
 
     def test_wallet_name_whitespace_stripping(self):
         """Test wallet name whitespace stripping."""
         wallet = Wallet(
-            user_id=ObjectId(),
-            name="  My Wallet  ",
-            description="Test wallet"
+            user_id=ObjectId(), name="  My Wallet  ", description="Test wallet"
         )
         assert wallet.name == "My Wallet"
 
     def test_wallet_name_empty_raises_error(self):
         """Test that empty wallet name raises error."""
         with pytest.raises(ValidationError, match="Wallet name cannot be empty"):
-            Wallet(
-                user_id=ObjectId(),
-                name="   ",
-                description="Test wallet"
-            )
+            Wallet(user_id=ObjectId(), name="   ", description="Test wallet")
 
     def test_wallet_name_length_constraints(self):
         """Test wallet name length constraints."""
         # Too long
         with pytest.raises(ValidationError):
-            Wallet(
-                user_id=ObjectId(),
-                name="a" * 201,
-                description="Test wallet"
-            )
-        
+            Wallet(user_id=ObjectId(), name="a" * 201, description="Test wallet")
+
         # Too short (empty after stripping)
         with pytest.raises(ValidationError):
-            Wallet(
-                user_id=ObjectId(),
-                name="",
-                description="Test wallet"
-            )
+            Wallet(user_id=ObjectId(), name="", description="Test wallet")
 
     def test_wallet_description_length_constraint(self):
         """Test wallet description length constraint."""
         with pytest.raises(ValidationError):
-            Wallet(
-                user_id=ObjectId(),
-                name="Test Wallet",
-                description="a" * 1001
-            )
+            Wallet(user_id=ObjectId(), name="Test Wallet", description="a" * 1001)
 
 
 class TestAssetFieldValidation:
@@ -209,36 +168,24 @@ class TestAssetFieldValidation:
 
     def test_asset_name_validation(self):
         """Test asset name validation."""
-        asset = Asset(
-            asset_name="Apple Inc.",
-            asset_type=AssetType.STOCK
-        )
+        asset = Asset(asset_name="Apple Inc.", asset_type=AssetType.STOCK)
         assert asset.asset_name == "Apple Inc."
 
     def test_asset_name_whitespace_stripping(self):
         """Test asset name whitespace stripping."""
-        asset = Asset(
-            asset_name="  Apple Inc.  ",
-            asset_type=AssetType.STOCK
-        )
+        asset = Asset(asset_name="  Apple Inc.  ", asset_type=AssetType.STOCK)
         assert asset.asset_name == "Apple Inc."
 
     def test_asset_name_empty_raises_error(self):
         """Test that empty asset name raises error."""
         with pytest.raises(ValidationError, match="Asset name cannot be empty"):
-            Asset(
-                asset_name="   ",
-                asset_type=AssetType.STOCK
-            )
+            Asset(asset_name="   ", asset_type=AssetType.STOCK)
 
     def test_asset_name_length_constraints(self):
         """Test asset name length constraints."""
         # Too long
         with pytest.raises(ValidationError):
-            Asset(
-                asset_name="a" * 201,
-                asset_type=AssetType.STOCK
-            )
+            Asset(asset_name="a" * 201, asset_type=AssetType.STOCK)
 
     def test_asset_url_validation_valid(self):
         """Test valid URL formats."""
@@ -246,15 +193,11 @@ class TestAssetFieldValidation:
             "https://api.example.com/stock/AAPL",
             "http://example.com/data",
             "https://www.google.com/finance",
-            None  # Optional field
+            None,  # Optional field
         ]
-        
+
         for url in valid_urls:
-            asset = Asset(
-                asset_name="Test Asset",
-                asset_type=AssetType.STOCK,
-                url=url
-            )
+            asset = Asset(asset_name="Test Asset", asset_type=AssetType.STOCK, url=url)
             assert asset.url == url
 
     def test_asset_url_validation_invalid(self):
@@ -264,23 +207,19 @@ class TestAssetFieldValidation:
             "ftp://example.com",
             "example.com",
             "www.example.com",
-            "javascript:alert('test')"
+            "javascript:alert('test')",
         ]
-        
+
         for url in invalid_urls:
             with pytest.raises(ValidationError, match="URL must start with http"):
-                Asset(
-                    asset_name="Test Asset",
-                    asset_type=AssetType.STOCK,
-                    url=url
-                )
+                Asset(asset_name="Test Asset", asset_type=AssetType.STOCK, url=url)
 
     def test_asset_url_whitespace_handling(self):
         """Test URL whitespace handling."""
         asset = Asset(
             asset_name="Test Asset",
             asset_type=AssetType.STOCK,
-            url="  https://example.com  "
+            url="  https://example.com  ",
         )
         assert asset.url == "https://example.com"
 
@@ -290,7 +229,7 @@ class TestAssetFieldValidation:
             Asset(
                 asset_name="Test Asset",
                 asset_type=AssetType.STOCK,
-                symbol="a" * 21  # Max is 20
+                symbol="a" * 21,  # Max is 20
             )
 
     def test_asset_description_length_constraint(self):
@@ -299,7 +238,7 @@ class TestAssetFieldValidation:
             Asset(
                 asset_name="Test Asset",
                 asset_type=AssetType.STOCK,
-                description="a" * 1001  # Max is 1000
+                description="a" * 1001,  # Max is 1000
             )
 
 
@@ -309,46 +248,37 @@ class TestAssetCurrentValueFieldValidation:
     def test_currency_validation_valid(self):
         """Test valid currency codes."""
         valid_currencies = ["USD", "EUR", "GBP", "JPY", "CAD"]
-        
+
         for currency in valid_currencies:
             value = AssetCurrentValue(
-                asset_id=ObjectId(),
-                date=datetime.now(),
-                price=100.0,
-                currency=currency
+                asset_id=ObjectId(), date=datetime.now(), price=100.0, currency=currency
             )
             assert value.currency == currency
 
     def test_currency_normalization(self):
         """Test currency normalization (uppercase)."""
         value = AssetCurrentValue(
-            asset_id=ObjectId(),
-            date=datetime.now(),
-            price=100.0,
-            currency="usd"
+            asset_id=ObjectId(), date=datetime.now(), price=100.0, currency="usd"
         )
         assert value.currency == "USD"
 
     def test_currency_validation_invalid_length(self):
         """Test invalid currency length."""
         invalid_currencies = ["US", "USDD", "U", "USDX"]
-        
+
         for currency in invalid_currencies:
             with pytest.raises(ValidationError):
                 AssetCurrentValue(
                     asset_id=ObjectId(),
                     date=datetime.now(),
                     price=100.0,
-                    currency=currency
+                    currency=currency,
                 )
 
     def test_price_validation_positive(self):
         """Test positive price validation."""
         value = AssetCurrentValue(
-            asset_id=ObjectId(),
-            date=datetime.now(),
-            price=100.0,
-            currency="USD"
+            asset_id=ObjectId(), date=datetime.now(), price=100.0, currency="USD"
         )
         assert value.price == 100.0
 
@@ -356,20 +286,14 @@ class TestAssetCurrentValueFieldValidation:
         """Test that zero price raises error."""
         with pytest.raises(ValidationError):
             AssetCurrentValue(
-                asset_id=ObjectId(),
-                date=datetime.now(),
-                price=0.0,
-                currency="USD"
+                asset_id=ObjectId(), date=datetime.now(), price=0.0, currency="USD"
             )
 
     def test_price_validation_negative_raises_error(self):
         """Test that negative price raises error."""
         with pytest.raises(ValidationError):
             AssetCurrentValue(
-                asset_id=ObjectId(),
-                date=datetime.now(),
-                price=-100.0,
-                currency="USD"
+                asset_id=ObjectId(), date=datetime.now(), price=-100.0, currency="USD"
             )
 
     def test_date_parsing_multiple_formats(self):
@@ -380,15 +304,12 @@ class TestAssetCurrentValueFieldValidation:
             "01/10/2024",
             "2024/01/10",
             "10-01-2024",
-            "2024-01-10 15:30:00"
+            "2024-01-10 15:30:00",
         ]
-        
+
         for date_str in test_dates:
             value = AssetCurrentValue(
-                asset_id=ObjectId(),
-                date=date_str,
-                price=100.0,
-                currency="USD"
+                asset_id=ObjectId(), date=date_str, price=100.0, currency="USD"
             )
             assert isinstance(value.date, datetime)
 
@@ -399,16 +320,13 @@ class TestAssetCurrentValueFieldValidation:
             "32/01/2024",  # Invalid day
             "13/13/2024",  # Invalid month (unambiguous)
             "2024-13-01",  # Invalid month
-            ""
+            "",
         ]
-        
+
         for date_str in invalid_dates:
             with pytest.raises(ValidationError):
                 AssetCurrentValue(
-                    asset_id=ObjectId(),
-                    date=date_str,
-                    price=100.0,
-                    currency="USD"
+                    asset_id=ObjectId(), date=date_str, price=100.0, currency="USD"
                 )
 
 
@@ -425,7 +343,7 @@ class TestTransactionFieldValidation:
             volume=10.0,
             item_price=100.0,
             transaction_amount=1000.0,
-            currency="usd"
+            currency="usd",
         )
         assert transaction.currency == "USD"
 
@@ -440,7 +358,7 @@ class TestTransactionFieldValidation:
                 volume=10.0,
                 item_price=100.0,
                 transaction_amount=1000.0,
-                currency="US"
+                currency="US",
             )
 
     def test_transaction_volume_validation(self):
@@ -454,7 +372,7 @@ class TestTransactionFieldValidation:
             volume=10.0,
             item_price=100.0,
             transaction_amount=1000.0,
-            currency="USD"
+            currency="USD",
         )
         assert transaction.volume == 10.0
 
@@ -469,7 +387,7 @@ class TestTransactionFieldValidation:
                 volume=-10.0,
                 item_price=100.0,
                 transaction_amount=1000.0,
-                currency="USD"
+                currency="USD",
             )
 
     def test_transaction_item_price_validation(self):
@@ -482,7 +400,7 @@ class TestTransactionFieldValidation:
             volume=10.0,
             item_price=100.0,
             transaction_amount=1000.0,
-            currency="USD"
+            currency="USD",
         )
         assert transaction.item_price == 100.0
 
@@ -497,7 +415,7 @@ class TestTransactionFieldValidation:
                 volume=10.0,
                 item_price=-100.0,
                 transaction_amount=1000.0,
-                currency="USD"
+                currency="USD",
             )
 
     def test_transaction_fee_validation(self):
@@ -511,7 +429,7 @@ class TestTransactionFieldValidation:
             item_price=100.0,
             transaction_amount=1000.0,
             currency="USD",
-            fee=5.0
+            fee=5.0,
         )
         assert transaction.fee == 5.0
 
@@ -527,7 +445,7 @@ class TestTransactionFieldValidation:
                 item_price=100.0,
                 transaction_amount=1000.0,
                 currency="USD",
-                fee=-5.0
+                fee=-5.0,
             )
 
     def test_transaction_fee_default_value(self):
@@ -540,7 +458,7 @@ class TestTransactionFieldValidation:
             volume=10.0,
             item_price=100.0,
             transaction_amount=1000.0,
-            currency="USD"
+            currency="USD",
         )
         assert transaction.fee == 0.0
 
@@ -552,9 +470,9 @@ class TestTransactionFieldValidation:
             "01/10/2024",
             "2024/01/10",
             "10-01-2024",
-            "2024-01-10 15:30:00"
+            "2024-01-10 15:30:00",
         ]
-        
+
         for date_str in test_dates:
             transaction = Transaction(
                 wallet_id=ObjectId(),
@@ -564,7 +482,7 @@ class TestTransactionFieldValidation:
                 volume=10.0,
                 item_price=100.0,
                 transaction_amount=1000.0,
-                currency="USD"
+                currency="USD",
             )
             assert isinstance(transaction.date, datetime)
 
@@ -580,7 +498,7 @@ class TestTransactionFieldValidation:
                 item_price=100.0,
                 transaction_amount=1000.0,
                 currency="USD",
-                notes="a" * 1001  # Max is 1000
+                notes="a" * 1001,  # Max is 1000
             )
 
 
@@ -598,9 +516,9 @@ class TestTransactionErrorFieldValidation:
             error_message="Test error",
             error_type="validation",
             transaction_type="buy",
-            asset_type="stock"
+            asset_type="stock",
         )
-        
+
         assert error.user_id is not None
         assert error.wallet_name == "Test Wallet"
         assert error.filename == "test.csv"
@@ -631,13 +549,8 @@ class TestPyObjectIdValidation:
 
     def test_pyobjectid_validation_invalid_string(self):
         """Test PyObjectId validation with invalid string."""
-        invalid_strings = [
-            "invalid-id",
-            "123",
-            "",
-            "not-an-objectid"
-        ]
-        
+        invalid_strings = ["invalid-id", "123", "", "not-an-objectid"]
+
         for invalid_str in invalid_strings:
             with pytest.raises(ValueError, match="Invalid ObjectId"):
                 PyObjectId.validate(invalid_str, None)

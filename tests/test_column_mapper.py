@@ -17,24 +17,27 @@ class TestColumnMapper:
         """Test that missing API key raises error."""
         # Temporarily disable the autouse mock for this test
         from src.services.column_mapper import ColumnMapper
-        
+
         # Create a new instance of the original class to get the original __init__
         def original_init(self, api_key=None, model_name=None, db=None, user_id=None):
             from src.config.settings import Settings
+
             self.api_key = api_key if api_key is not None else Settings.GOOGLE_API_KEY
-            self.model_name = model_name if model_name is not None else Settings.GENAI_MODEL
+            self.model_name = (
+                model_name if model_name is not None else Settings.GENAI_MODEL
+            )
             self.db = db
             self.user_id = user_id
             self.cache_version = 1
-            
+
             if not self.api_key or not self.api_key.strip():
                 raise ValueError(
                     "Google API key is required. Set GOOGLE_API_KEY environment variable."
                 )
-        
+
         # Restore original init temporarily
         monkeypatch.setattr(ColumnMapper, "__init__", original_init)
-        
+
         # Pass empty string directly instead of relying on environment variable
         with pytest.raises(ValueError, match="Google API key is required"):
             ColumnMapper(api_key="")
@@ -201,32 +204,41 @@ class TestColumnMapper:
     def test_map_columns_with_real_api(self, set_test_env_vars):
         """
         Test column mapping with real Gemini API.
-        
+
         This test requires USE_REAL_AI=true environment variable to run.
         It will be skipped if USE_REAL_AI is not set to true.
         """
         pytest.skip("Real API test - requires USE_REAL_AI=true")
-        
+
         # This test would only run when USE_REAL_AI=true is set
         # and the test is marked with @pytest.mark.gemini_api
         mapper = ColumnMapper()
-        
+
         # Create a sample DataFrame
-        df = pd.DataFrame({
-            'Account': ['MyWallet', 'Savings'],
-            'Stock Name': ['AAPL', 'MSFT'],
-            'Trade Date': ['2024-01-10', '2024-01-11'],
-            'Price': [150.50, 380.25],
-            'Shares': [10, 5],
-            'Curr': ['USD', 'USD']
-        })
-        
+        df = pd.DataFrame(
+            {
+                "Account": ["MyWallet", "Savings"],
+                "Stock Name": ["AAPL", "MSFT"],
+                "Trade Date": ["2024-01-10", "2024-01-11"],
+                "Price": [150.50, 380.25],
+                "Shares": [10, 5],
+                "Curr": ["USD", "USD"],
+            }
+        )
+
         # Test with real API (this would make actual API calls)
-        result = mapper.map_columns(df, [
-            "wallet_name", "asset_name", "date", 
-            "asset_item_price", "volume", "currency"
-        ])
-        
+        result = mapper.map_columns(
+            df,
+            [
+                "wallet_name",
+                "asset_name",
+                "date",
+                "asset_item_price",
+                "volume",
+                "currency",
+            ],
+        )
+
         # Verify the mapping worked
         assert result is not None
         assert len(result) > 0

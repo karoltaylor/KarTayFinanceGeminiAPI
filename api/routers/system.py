@@ -13,7 +13,7 @@ router = APIRouter(tags=["System"])
 async def root():
     """
     Get API information and available endpoints.
-    
+
     **Returns:**
     - API name, version, and status
     - Authentication method
@@ -43,12 +43,12 @@ async def root():
 async def health_check(db: Database = Depends(get_db)):
     """
     Check API and database health status.
-    
+
     **Returns:**
     - API status (healthy/unhealthy)
     - MongoDB connection status
     - Database name
-    
+
     **Status Codes:**
     - 200: All systems operational
     - 503: Service unavailable (MongoDB disconnected)
@@ -65,4 +65,3 @@ async def health_check(db: Database = Depends(get_db)):
             status_code=503,
             content={"status": "unhealthy", "mongodb": "disconnected", "error": str(e)},
         )
-

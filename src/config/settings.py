@@ -17,7 +17,7 @@ def _get_active_env_file():
                 return env_file
         except:
             pass
-    
+
     # Fallback to ENV_FILE environment variable or .env
     return os.getenv("ENV_FILE", ".env")
 
@@ -45,7 +45,7 @@ class Settings:
     # Security settings
     ENFORCE_HTTPS: bool = os.getenv("ENFORCE_HTTPS", "false").lower() == "true"
     ALLOWED_HOSTS: list = os.getenv("ALLOWED_HOSTS", "*").split(",")
-    
+
     # CORS settings
     @classmethod
     def get_cors_origins(cls) -> list:

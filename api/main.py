@@ -19,6 +19,7 @@ from api import logs
 # LIFESPAN & STARTUP
 # ==============================================================================
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown."""
@@ -28,7 +29,7 @@ async def lifespan(app: FastAPI):
         # Show connection info (mask credentials)
         print("[DEBUG] Retrieving MongoDB configuration...")
         db_url = MongoDBConfig.get_mongodb_url() or "Not set"
-        
+
         if db_url and db_url != "Not set":
             if "@" in db_url:
                 # Mask the password in the URL
@@ -39,10 +40,10 @@ async def lifespan(app: FastAPI):
                 masked_url = db_url[:30] + "..." if len(db_url) > 30 else db_url
         else:
             masked_url = "NOT SET (will fail)"
-        
+
         print(f"[INFO] Connecting to: {masked_url}")
         print(f"[INFO] Database: {MongoDBConfig.get_mongodb_database()}")
-        
+
         print("[DEBUG] Calling MongoDBConfig.initialize_collections()...")
         MongoDBConfig.initialize_collections()
         print("[OK] MongoDB connected and initialized")
@@ -51,13 +52,14 @@ async def lifespan(app: FastAPI):
         print(f"[ERROR] Exception type: {type(e).__name__}")
         print(f"[ERROR] Exception message: {str(e)}")
         import traceback
+
         print(f"[ERROR] Traceback:\n{traceback.format_exc()}")
         print("[WARNING] Continuing without MongoDB connection...")
-    
+
     print("[DEBUG] ===============================================")
-    
+
     yield
-    
+
     # Shutdown
     print("[DEBUG] ========== FastAPI Lifespan Shutdown ==========")
     MongoDBConfig.close_connection()
@@ -91,26 +93,19 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
-        "Content-Type",               # For JSON request bodies
-        "Accept",                     # For response content negotiation
-        "X-User-ID",                  # Custom auth header
-        "Authorization",              # For future OAuth token support
+        "Content-Type",  # For JSON request bodies
+        "Accept",  # For response content negotiation
+        "X-User-ID",  # Custom auth header
+        "Authorization",  # For future OAuth token support
     ],
 )
 
 # Trusted Host middleware - prevent host header attacks
 if Settings.ALLOWED_HOSTS != ["*"]:
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=Settings.ALLOWED_HOSTS
-    )
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=Settings.ALLOWED_HOSTS)
 
 # Logging middleware - log all requests and responses
-app.add_middleware(
-    LoggingMiddleware,
-    log_requests=True,
-    log_responses=True
-)
+app.add_middleware(LoggingMiddleware, log_requests=True, log_responses=True)
 
 
 # HTTPS Enforcement Middleware
@@ -118,7 +113,7 @@ app.add_middleware(
 async def enforce_https(request: Request, call_next):
     """
     Enforce HTTPS in production.
-    
+
     - In development (ENFORCE_HTTPS=false): Allows HTTP
     - In production (ENFORCE_HTTPS=true): Redirects HTTP to HTTPS
     """
@@ -128,17 +123,19 @@ async def enforce_https(request: Request, call_next):
             # Redirect to HTTPS version
             https_url = request.url.replace(scheme="https")
             return RedirectResponse(https_url, status_code=301)
-    
+
     response = await call_next(request)
-    
+
     # Add security headers to all responses
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
-    
+
     if Settings.ENFORCE_HTTPS:
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+
     return response
 
 
@@ -166,4 +163,3 @@ app.include_router(stats.router)
 
 # Logging routes (from existing logs.py)
 app.include_router(logs.router)
-

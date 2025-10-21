@@ -25,7 +25,9 @@ class TestWallet:
     def test_create_wallet_with_valid_data(self):
         """Test creating a wallet with valid data."""
         user_id = ObjectId()
-        wallet = Wallet(user_id=user_id, name="My Savings", description="Personal savings wallet")
+        wallet = Wallet(
+            user_id=user_id, name="My Savings", description="Personal savings wallet"
+        )
 
         assert wallet.name == "My Savings"
         assert wallet.description == "Personal savings wallet"

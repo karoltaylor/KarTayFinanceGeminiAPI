@@ -16,26 +16,30 @@ pytestmark = pytest.mark.integration
 def test_db(unique_test_email, unique_test_username):
     """
     Get test database instance and set up test user.
-    
+
     NOTE: This uses the database configured in environment.
     For true isolation, consider using a separate test database.
     """
     db = MongoDBConfig.get_database()
-    
+
     # Test user IDs
     test_user_id = ObjectId("507f1f77bcf86cd799439011")
     test_user_id_2 = ObjectId("507f1f77bcf86cd799439012")
-    
+
     # Clean up test data before each test
-    db.wallets.delete_many({"$or": [
-        {"user_id": test_user_id},
-        {"user_id": str(test_user_id)},
-        {"user_id": test_user_id_2},
-        {"user_id": str(test_user_id_2)}
-    ]})
+    db.wallets.delete_many(
+        {
+            "$or": [
+                {"user_id": test_user_id},
+                {"user_id": str(test_user_id)},
+                {"user_id": test_user_id_2},
+                {"user_id": str(test_user_id_2)},
+            ]
+        }
+    )
     db.transactions.delete_many({})  # Clean all test transactions
     db.users.delete_many({"_id": {"$in": [test_user_id, test_user_id_2]}})
-    
+
     # Create test users with unique emails
     test_user_1 = {
         "_id": test_user_id,
@@ -44,7 +48,7 @@ def test_db(unique_test_email, unique_test_username):
         "full_name": "Test User",
         "is_active": True,
         "created_at": datetime.now(UTC),
-        "updated_at": datetime.now(UTC)
+        "updated_at": datetime.now(UTC),
     }
     test_user_2 = {
         "_id": test_user_id_2,
@@ -53,29 +57,25 @@ def test_db(unique_test_email, unique_test_username):
         "full_name": "Test User 2",
         "is_active": True,
         "created_at": datetime.now(UTC),
-        "updated_at": datetime.now(UTC)
+        "updated_at": datetime.now(UTC),
     }
-    
-    db.users.update_one(
-        {"_id": test_user_id},
-        {"$set": test_user_1},
-        upsert=True
-    )
-    db.users.update_one(
-        {"_id": test_user_id_2},
-        {"$set": test_user_2},
-        upsert=True
-    )
-    
+
+    db.users.update_one({"_id": test_user_id}, {"$set": test_user_1}, upsert=True)
+    db.users.update_one({"_id": test_user_id_2}, {"$set": test_user_2}, upsert=True)
+
     yield db
-    
+
     # Clean up test data after each test
-    db.wallets.delete_many({"$or": [
-        {"user_id": test_user_id},
-        {"user_id": str(test_user_id)},
-        {"user_id": test_user_id_2},
-        {"user_id": str(test_user_id_2)}
-    ]})
+    db.wallets.delete_many(
+        {
+            "$or": [
+                {"user_id": test_user_id},
+                {"user_id": str(test_user_id)},
+                {"user_id": test_user_id_2},
+                {"user_id": str(test_user_id_2)},
+            ]
+        }
+    )
     db.transactions.delete_many({})
     db.users.delete_many({"_id": {"$in": [test_user_id, test_user_id_2]}})
 
@@ -101,7 +101,7 @@ class TestListWallets:
     def test_list_wallets_empty(self, client, auth_headers, test_db):
         """Test listing wallets when user has none."""
         response = client.get("/api/wallets", headers=auth_headers)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "wallets" in data
@@ -117,24 +117,24 @@ class TestListWallets:
             "name": "Test Wallet 1",
             "description": "First test wallet",
             "created_at": datetime.now(UTC),
-            "updated_at": datetime.now(UTC)
+            "updated_at": datetime.now(UTC),
         }
         wallet2 = {
             "user_id": ObjectId(test_user_id),
             "name": "Test Wallet 2",
             "description": "Second test wallet",
             "created_at": datetime.now(UTC),
-            "updated_at": datetime.now(UTC)
+            "updated_at": datetime.now(UTC),
         }
         test_db.wallets.insert_many([wallet1, wallet2])
-        
+
         response = client.get("/api/wallets", headers=auth_headers)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["count"] == 2
         assert len(data["wallets"]) == 2
-        
+
         # Check wallet structure
         wallet = data["wallets"][0]
         assert "_id" in wallet
@@ -153,18 +153,18 @@ class TestListWallets:
                 "name": f"Wallet {i}",
                 "description": f"Test wallet {i}",
                 "created_at": datetime.now(UTC),
-                "updated_at": datetime.now(UTC)
+                "updated_at": datetime.now(UTC),
             }
             for i in range(5)
         ]
         test_db.wallets.insert_many(wallets)
-        
+
         # Test limit
         response = client.get("/api/wallets?limit=2", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["count"] == 2
-        
+
         # Test skip
         response = client.get("/api/wallets?skip=2&limit=2", headers=auth_headers)
         assert response.status_code == 200
@@ -175,48 +175,55 @@ class TestListWallets:
         """Test that listing wallets without auth header fails."""
         # Temporarily clear dependency overrides to test actual auth behavior
         from api.main import app
+
         app.dependency_overrides.clear()
-        
+
         response = client.get("/api/wallets")
-        
+
         assert response.status_code == 401  # Unauthorized (missing authentication)
 
     def test_list_wallets_invalid_user_id(self, client):
         """Test that invalid user ID in header fails."""
         # Temporarily clear dependency overrides to test actual auth behavior
         from api.main import app
+
         app.dependency_overrides.clear()
-        
+
         headers = {"Authorization": "Bearer invalid-token"}
         response = client.get("/api/wallets", headers=headers)
-        
+
         assert response.status_code == 401
         # Check that error message contains authentication-related text
         detail = response.json()["detail"]
-        assert any(word in detail.lower() for word in ["authentication", "invalid", "token", "expired"])
+        assert any(
+            word in detail.lower()
+            for word in ["authentication", "invalid", "token", "expired"]
+        )
 
-    def test_list_wallets_only_shows_user_wallets(self, client, auth_headers, test_db, test_user_id):
+    def test_list_wallets_only_shows_user_wallets(
+        self, client, auth_headers, test_db, test_user_id
+    ):
         """Test that users only see their own wallets."""
         # Create wallet for test user
         test_wallet = {
             "user_id": ObjectId(test_user_id),
             "name": "My Wallet",
             "created_at": datetime.now(UTC),
-            "updated_at": datetime.now(UTC)
+            "updated_at": datetime.now(UTC),
         }
-        
+
         # Create wallet for different user
         other_user_wallet = {
             "user_id": ObjectId("507f1f77bcf86cd799439012"),  # Different user
             "name": "Other User Wallet",
             "created_at": datetime.now(UTC),
-            "updated_at": datetime.now(UTC)
+            "updated_at": datetime.now(UTC),
         }
-        
+
         test_db.wallets.insert_many([test_wallet, other_user_wallet])
-        
+
         response = client.get("/api/wallets", headers=auth_headers)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["count"] == 1
@@ -230,11 +237,11 @@ class TestCreateWallet:
         """Test successful wallet creation."""
         wallet_data = {
             "name": "My Investment Wallet",
-            "description": "For tracking investments"
+            "description": "For tracking investments",
         }
-        
+
         response = client.post("/api/wallets", json=wallet_data, headers=auth_headers)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -247,28 +254,28 @@ class TestCreateWallet:
 
     def test_create_wallet_without_description(self, client, auth_headers, test_db):
         """Test creating wallet without optional description."""
-        wallet_data = {
-            "name": "Simple Wallet"
-        }
-        
+        wallet_data = {"name": "Simple Wallet"}
+
         response = client.post("/api/wallets", json=wallet_data, headers=auth_headers)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
         assert data["data"]["name"] == "Simple Wallet"
         assert data["data"]["description"] is None
 
-    def test_create_wallet_duplicate_name(self, client, auth_headers, test_db, test_user_id):
+    def test_create_wallet_duplicate_name(
+        self, client, auth_headers, test_db, test_user_id
+    ):
         """Test that creating wallet with duplicate name fails."""
         # Create first wallet
         wallet_data = {"name": "My Wallet", "description": "First wallet"}
         response = client.post("/api/wallets", json=wallet_data, headers=auth_headers)
         assert response.status_code == 200
-        
+
         # Try to create wallet with same name
         response = client.post("/api/wallets", json=wallet_data, headers=auth_headers)
-        
+
         assert response.status_code == 409
         assert "already exists" in response.json()["detail"]
 
@@ -278,7 +285,7 @@ class TestCreateWallet:
         wallet_data = {"description": "No name"}
         response = client.post("/api/wallets", json=wallet_data, headers=auth_headers)
         assert response.status_code == 422
-        
+
         # Empty name
         wallet_data = {"name": ""}
         response = client.post("/api/wallets", json=wallet_data, headers=auth_headers)
@@ -286,33 +293,30 @@ class TestCreateWallet:
 
     def test_create_wallet_name_too_long(self, client, auth_headers, test_db):
         """Test creating wallet with name exceeding max length."""
-        wallet_data = {
-            "name": "A" * 201  # Max is 200 characters
-        }
-        
+        wallet_data = {"name": "A" * 201}  # Max is 200 characters
+
         response = client.post("/api/wallets", json=wallet_data, headers=auth_headers)
-        
+
         assert response.status_code == 422
 
     def test_create_wallet_without_auth(self, client):
         """Test that creating wallet without auth fails."""
         # Temporarily clear dependency overrides to test actual auth behavior
         from api.main import app
+
         app.dependency_overrides.clear()
-        
+
         wallet_data = {"name": "Unauthorized Wallet"}
         response = client.post("/api/wallets", json=wallet_data)
-        
+
         assert response.status_code == 401
 
     def test_create_wallet_strips_whitespace(self, client, auth_headers, test_db):
         """Test that wallet name whitespace is stripped."""
-        wallet_data = {
-            "name": "  Wallet With Spaces  "
-        }
-        
+        wallet_data = {"name": "  Wallet With Spaces  "}
+
         response = client.post("/api/wallets", json=wallet_data, headers=auth_headers)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["data"]["name"] == "Wallet With Spaces"
@@ -328,34 +332,36 @@ class TestDeleteWallet:
             "user_id": ObjectId(test_user_id),
             "name": "Wallet to Delete",
             "created_at": datetime.now(UTC),
-            "updated_at": datetime.now(UTC)
+            "updated_at": datetime.now(UTC),
         }
         result = test_db.wallets.insert_one(wallet)
         wallet_id = str(result.inserted_id)
-        
+
         response = client.delete(f"/api/wallets/{wallet_id}", headers=auth_headers)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
         assert "deleted successfully" in data["message"]
-        
+
         # Verify wallet is deleted
         deleted_wallet = test_db.wallets.find_one({"_id": result.inserted_id})
         assert deleted_wallet is None
 
-    def test_delete_wallet_with_transactions(self, client, auth_headers, test_db, test_user_id):
+    def test_delete_wallet_with_transactions(
+        self, client, auth_headers, test_db, test_user_id
+    ):
         """Test deleting wallet also deletes its transactions."""
         # Create wallet
         wallet = {
             "user_id": ObjectId(test_user_id),
             "name": "Wallet with Transactions",
             "created_at": datetime.now(UTC),
-            "updated_at": datetime.now(UTC)
+            "updated_at": datetime.now(UTC),
         }
         result = test_db.wallets.insert_one(wallet)
         wallet_id = result.inserted_id
-        
+
         # Create some transactions
         transactions = [
             {
@@ -368,35 +374,37 @@ class TestDeleteWallet:
                 "currency": "USD",
                 "fee": 5.0,
                 "created_at": datetime.now(UTC),
-                "updated_at": datetime.now(UTC)
+                "updated_at": datetime.now(UTC),
             }
             for _ in range(3)
         ]
         test_db.transactions.insert_many(transactions)
-        
+
         response = client.delete(f"/api/wallets/{str(wallet_id)}", headers=auth_headers)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["transactions_deleted"] == 3
-        
+
         # Verify transactions are deleted
-        remaining_transactions = test_db.transactions.count_documents({"wallet_id": wallet_id})
+        remaining_transactions = test_db.transactions.count_documents(
+            {"wallet_id": wallet_id}
+        )
         assert remaining_transactions == 0
 
     def test_delete_wallet_not_found(self, client, auth_headers, test_db):
         """Test deleting non-existent wallet."""
         fake_wallet_id = str(ObjectId())
-        
+
         response = client.delete(f"/api/wallets/{fake_wallet_id}", headers=auth_headers)
-        
+
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
 
     def test_delete_wallet_invalid_id_format(self, client, auth_headers, test_db):
         """Test deleting wallet with invalid ID format."""
         response = client.delete("/api/wallets/invalid-id", headers=auth_headers)
-        
+
         assert response.status_code == 400
         assert "Invalid wallet ID format" in response.json()["detail"]
 
@@ -408,22 +416,22 @@ class TestDeleteWallet:
             "user_id": other_user_id,
             "name": "Other User Wallet Test",  # Unique name to avoid conflicts
             "created_at": datetime.now(UTC),
-            "updated_at": datetime.now(UTC)
+            "updated_at": datetime.now(UTC),
         }
         result = test_db.wallets.insert_one(other_user_wallet)
         wallet_id = str(result.inserted_id)
         wallet_obj_id = result.inserted_id
-        
+
         # Try to delete as different user
         response = client.delete(f"/api/wallets/{wallet_id}", headers=auth_headers)
-        
+
         assert response.status_code == 404
         assert "not found or not owned by user" in response.json()["detail"]
-        
+
         # Verify wallet still exists for the other user
         wallet = test_db.wallets.find_one({"_id": wallet_obj_id})
         assert wallet is not None
-        
+
         # Clean up this specific test wallet
         test_db.wallets.delete_one({"_id": wallet_obj_id})
 
@@ -431,20 +439,21 @@ class TestDeleteWallet:
         """Test that deleting wallet without auth fails."""
         # Temporarily clear dependency overrides to test actual auth behavior
         from api.main import app
+
         app.dependency_overrides.clear()
-        
+
         # Create a wallet
         wallet = {
             "user_id": ObjectId(test_user_id),
             "name": "Protected Wallet",
             "created_at": datetime.now(UTC),
-            "updated_at": datetime.now(UTC)
+            "updated_at": datetime.now(UTC),
         }
         result = test_db.wallets.insert_one(wallet)
         wallet_id = str(result.inserted_id)
-        
+
         response = client.delete(f"/api/wallets/{wallet_id}")
-        
+
         assert response.status_code == 401
 
 
@@ -458,27 +467,27 @@ class TestWalletEndpointsIntegration:
         assert response.status_code == 200
         data = response.json()
         initial_count = data.get("count", 0)
-        
+
         # Create first wallet
         wallet1_data = {"name": "Savings", "description": "My savings account"}
         response = client.post("/api/wallets", json=wallet1_data, headers=auth_headers)
         assert response.status_code == 200
         wallet1_id = response.json()["data"]["_id"]
-        
+
         # Create second wallet
         wallet2_data = {"name": "Investment", "description": "Investment portfolio"}
         response = client.post("/api/wallets", json=wallet2_data, headers=auth_headers)
         assert response.status_code == 200
         wallet2_id = response.json()["data"]["_id"]
-        
+
         # List should show 2 wallets (plus any initial ones)
         response = client.get("/api/wallets", headers=auth_headers)
         assert response.json()["count"] == initial_count + 2
-        
+
         # Delete first wallet
         response = client.delete(f"/api/wallets/{wallet1_id}", headers=auth_headers)
         assert response.status_code == 200
-        
+
         # List should show 1 wallet (plus any initial ones)
         response = client.get("/api/wallets", headers=auth_headers)
         data = response.json()
@@ -486,70 +495,75 @@ class TestWalletEndpointsIntegration:
         # Find the Investment wallet in the list
         wallet_names = [w["name"] for w in data["wallets"]]
         assert "Investment" in wallet_names
-        
+
         # Delete second wallet
         response = client.delete(f"/api/wallets/{wallet2_id}", headers=auth_headers)
         assert response.status_code == 200
-        
+
         # List should be back to initial count
         response = client.get("/api/wallets", headers=auth_headers)
         assert response.json()["count"] == initial_count
 
-    def test_multiple_users_isolation(self, client, test_db, auth_headers, auth_headers_user2, override_auth_user2):
+    def test_multiple_users_isolation(
+        self, client, test_db, auth_headers, auth_headers_user2, override_auth_user2
+    ):
         """Test that wallet operations are isolated between users."""
         from api.main import app
         from api.dependencies import get_current_user
         from src.auth.firebase_auth import get_current_user_from_token
         from bson import ObjectId
-        
+
         # User 1 (default) gets initial count
         response1 = client.get("/api/wallets", headers=auth_headers)
         assert response1.status_code == 200
         user1_initial = response1.json()["count"]
-        
+
         # Switch to user 2
         app.dependency_overrides[get_current_user] = override_auth_user2
         app.dependency_overrides[get_current_user_from_token] = override_auth_user2
-        
+
         response2 = client.get("/api/wallets", headers=auth_headers_user2)
         assert response2.status_code == 200
         user2_initial = response2.json()["count"]
-        
+
         # Switch back to user 1
         test_user_id = ObjectId("507f1f77bcf86cd799439011")
+
         async def mock_get_user1():
             return test_user_id
+
         app.dependency_overrides[get_current_user] = mock_get_user1
         app.dependency_overrides[get_current_user_from_token] = mock_get_user1
-        
+
         # User 1 creates a wallet
         wallet_data = {"name": "User 1 Wallet"}
         response = client.post("/api/wallets", json=wallet_data, headers=auth_headers)
         assert response.status_code == 200
-        
+
         # Switch to user 2
         app.dependency_overrides[get_current_user] = override_auth_user2
         app.dependency_overrides[get_current_user_from_token] = override_auth_user2
-        
+
         # User 2 creates a wallet with the same name (should succeed - different user)
-        response = client.post("/api/wallets", json=wallet_data, headers=auth_headers_user2)
+        response = client.post(
+            "/api/wallets", json=wallet_data, headers=auth_headers_user2
+        )
         assert response.status_code == 200
-        
+
         # Switch back to user 1
         app.dependency_overrides[get_current_user] = mock_get_user1
         app.dependency_overrides[get_current_user_from_token] = mock_get_user1
-        
+
         # User 1 sees only their wallet
         response = client.get("/api/wallets", headers=auth_headers)
         assert response.status_code == 200
         assert response.json()["count"] == user1_initial + 1
-        
+
         # Switch to user 2
         app.dependency_overrides[get_current_user] = override_auth_user2
         app.dependency_overrides[get_current_user_from_token] = override_auth_user2
-        
+
         # User 2 sees only their wallet
         response = client.get("/api/wallets", headers=auth_headers_user2)
         assert response.status_code == 200
         assert response.json()["count"] == user2_initial + 1
-

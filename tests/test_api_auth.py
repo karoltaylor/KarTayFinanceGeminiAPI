@@ -39,18 +39,20 @@ class TestUserRegistration:
         """Test successful registration of new user."""
         # Mock user not existing
         mock_db.users.find_one.return_value = None
-        mock_db.users.insert_one.return_value.inserted_id = ObjectId("507f1f77bcf86cd799439011")
-        
+        mock_db.users.insert_one.return_value.inserted_id = ObjectId(
+            "507f1f77bcf86cd799439011"
+        )
+
         user_data = {
             "email": "test@example.com",
             "username": "testuser",
             "full_name": "Test User",
             "oauth_provider": "google",
-            "oauth_id": "google123"
+            "oauth_id": "google123",
         }
-        
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -63,18 +65,15 @@ class TestUserRegistration:
         existing_user = {
             "_id": ObjectId("507f1f77bcf86cd799439011"),
             "email": "test@example.com",
-            "username": "testuser"
+            "username": "testuser",
         }
-        
+
         mock_db.users.find_one.return_value = existing_user
-        
-        user_data = {
-            "email": "test@example.com",
-            "username": "testuser"
-        }
-        
+
+        user_data = {"email": "test@example.com", "username": "testuser"}
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -88,20 +87,20 @@ class TestUserRegistration:
             "email": "test@example.com",
             "username": "testuser",
             "oauth_provider": "google",
-            "oauth_id": "google123"
+            "oauth_id": "google123",
         }
-        
+
         mock_db.users.find_one.return_value = existing_user
-        
+
         user_data = {
             "email": "test@example.com",
             "username": "testuser",
             "oauth_provider": "google",
-            "oauth_id": "google123"
+            "oauth_id": "google123",
         }
-        
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -113,16 +112,18 @@ class TestUserRegistration:
         # Mock second lookup returns existing user (username taken)
         # Mock third lookup returns None (unique username found)
         mock_db.users.find_one.side_effect = [None, {"username": "testuser"}, None]
-        mock_db.users.insert_one.return_value.inserted_id = ObjectId("507f1f77bcf86cd799439011")
-        
+        mock_db.users.insert_one.return_value.inserted_id = ObjectId(
+            "507f1f77bcf86cd799439011"
+        )
+
         user_data = {
             "email": "test@example.com",
             "username": "testuser",
-            "full_name": "Test User"
+            "full_name": "Test User",
         }
-        
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["username"] == "testuser_1"  # Should append suffix
@@ -130,48 +131,53 @@ class TestUserRegistration:
     def test_register_user_sanitizes_username(self, client, mock_db):
         """Test that username is sanitized properly."""
         mock_db.users.find_one.return_value = None
-        mock_db.users.insert_one.return_value.inserted_id = ObjectId("507f1f77bcf86cd799439011")
-        
+        mock_db.users.insert_one.return_value.inserted_id = ObjectId(
+            "507f1f77bcf86cd799439011"
+        )
+
         user_data = {
             "email": "test@example.com",
             "username": "Test User!@#",
-            "full_name": "Test User"
+            "full_name": "Test User",
         }
-        
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 200
         data = response.json()
-        assert data["username"] == "test_user___"  # Special chars replaced with underscores
+        assert (
+            data["username"] == "test_user___"
+        )  # Special chars replaced with underscores
 
     def test_register_user_generates_username_from_email(self, client, mock_db):
         """Test that username is generated from email when invalid."""
         mock_db.users.find_one.return_value = None
-        mock_db.users.insert_one.return_value.inserted_id = ObjectId("507f1f77bcf86cd799439011")
-        
+        mock_db.users.insert_one.return_value.inserted_id = ObjectId(
+            "507f1f77bcf86cd799439011"
+        )
+
         user_data = {
             "email": "test@example.com",
             "username": "ab",  # Too short - will be rejected by Pydantic validation
-            "full_name": "Test User"
+            "full_name": "Test User",
         }
-        
+
         # This should fail validation before reaching the username generation logic
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 422
 
     def test_register_user_normalizes_email(self, client, mock_db):
         """Test that email is normalized to lowercase."""
         mock_db.users.find_one.return_value = None
-        mock_db.users.insert_one.return_value.inserted_id = ObjectId("507f1f77bcf86cd799439011")
-        
-        user_data = {
-            "email": "TEST@EXAMPLE.COM",
-            "username": "testuser"
-        }
-        
+        mock_db.users.insert_one.return_value.inserted_id = ObjectId(
+            "507f1f77bcf86cd799439011"
+        )
+
+        user_data = {"email": "TEST@EXAMPLE.COM", "username": "testuser"}
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["email"] == "test@example.com"
@@ -182,57 +188,48 @@ class TestUserRegistration:
             "email": "test@example.com"
             # Missing username
         }
-        
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 422
 
     def test_register_user_invalid_email_format(self, client):
         """Test registration with invalid email format."""
-        user_data = {
-            "email": "invalid-email",
-            "username": "testuser"
-        }
-        
+        user_data = {"email": "invalid-email", "username": "testuser"}
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         # The email validation might not be strict enough, so it could return 200
         # Let's check what the actual response is
         assert response.status_code in [200, 422]
 
     def test_register_user_username_too_long(self, client):
         """Test registration with username too long."""
-        user_data = {
-            "email": "test@example.com",
-            "username": "a" * 51  # Too long
-        }
-        
+        user_data = {"email": "test@example.com", "username": "a" * 51}  # Too long
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 422
 
     def test_register_user_email_too_long(self, client):
         """Test registration with email too long."""
         user_data = {
             "email": "a" * 250 + "@example.com",  # Too long
-            "username": "testuser"
+            "username": "testuser",
         }
-        
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 422
 
     def test_register_user_database_error(self, client, mock_db):
         """Test registration handles database errors gracefully."""
         mock_db.users.find_one.side_effect = Exception("Database connection failed")
-        
-        user_data = {
-            "email": "test@example.com",
-            "username": "testuser"
-        }
-        
+
+        user_data = {"email": "test@example.com", "username": "testuser"}
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         # The endpoint converts exceptions to HTTPException with status 500
         assert response.status_code == 500
         data = response.json()
@@ -245,20 +242,20 @@ class TestUserRegistration:
             "email": "test@example.com",
             "username": "testuser",
             "oauth_provider": None,
-            "oauth_id": None
+            "oauth_id": None,
         }
-        
+
         mock_db.users.find_one.return_value = existing_user
-        
+
         user_data = {
             "email": "test@example.com",
             "username": "testuser",
             "oauth_provider": "google",
-            "oauth_id": "google123"
+            "oauth_id": "google123",
         }
-        
+
         response = client.post("/api/users/register", json=user_data)
-        
+
         assert response.status_code == 200
         # Verify OAuth info was updated
         mock_db.users.update_one.assert_called_once()
@@ -274,14 +271,16 @@ class TestGetCurrentUserInfo:
             "_id": user_id,
             "email": "test@example.com",
             "username": "testuser",
-            "full_name": "Test User"
+            "full_name": "Test User",
         }
-        
-        with patch('api.routers.auth.get_current_user_from_token', return_value=user_id):
+
+        with patch(
+            "api.routers.auth.get_current_user_from_token", return_value=user_id
+        ):
             mock_db.users.find_one.return_value = user_data
-            
+
             response = client.get("/api/users/me")
-            
+
             assert response.status_code == 200
             data = response.json()
             assert data["user_id"] == str(user_id)
@@ -291,12 +290,14 @@ class TestGetCurrentUserInfo:
     def test_get_current_user_info_user_not_found(self, client, mock_db):
         """Test get current user info when user doesn't exist."""
         user_id = ObjectId("507f1f77bcf86cd799439011")
-        
-        with patch('api.routers.auth.get_current_user_from_token', return_value=user_id):
+
+        with patch(
+            "api.routers.auth.get_current_user_from_token", return_value=user_id
+        ):
             mock_db.users.find_one.return_value = None
-            
+
             response = client.get("/api/users/me")
-            
+
             assert response.status_code == 404
 
     def test_get_current_user_info_masks_password(self, client, mock_db):
@@ -306,14 +307,16 @@ class TestGetCurrentUserInfo:
             "_id": user_id,
             "email": "test@example.com",
             "username": "testuser",
-            "password": "secret123"  # Should be masked
+            "password": "secret123",  # Should be masked
         }
-        
-        with patch('api.routers.auth.get_current_user_from_token', return_value=user_id):
+
+        with patch(
+            "api.routers.auth.get_current_user_from_token", return_value=user_id
+        ):
             mock_db.users.find_one.return_value = user_data
-            
+
             response = client.get("/api/users/me")
-            
+
             assert response.status_code == 200
             data = response.json()
             assert "password" not in data
@@ -324,16 +327,20 @@ class TestGetCurrentUserInfo:
         user_data = {
             "_id": user_id,
             "email": "test@example.com",
-            "username": "testuser"
+            "username": "testuser",
         }
-        
-        with patch('api.routers.auth.get_current_user_from_token', return_value=user_id), \
-             patch('api.routers.auth.MongoDBConfig.get_mongodb_url', return_value="mongodb://user:pass@host/db"):
-            
+
+        with patch(
+            "api.routers.auth.get_current_user_from_token", return_value=user_id
+        ), patch(
+            "api.routers.auth.MongoDBConfig.get_mongodb_url",
+            return_value="mongodb://user:pass@host/db",
+        ):
+
             mock_db.users.find_one.return_value = user_data
-            
+
             response = client.get("/api/users/me")
-            
+
             assert response.status_code == 200
             data = response.json()
             # Verify password is masked in URL
@@ -344,15 +351,17 @@ class TestGetCurrentUserInfo:
         user_id = ObjectId("507f1f77bcf86cd799439011")
         user_data = {
             "_id": user_id,
-            "email": "test@example.com"
+            "email": "test@example.com",
             # Missing username
         }
-        
-        with patch('api.routers.auth.get_current_user_from_token', return_value=user_id):
+
+        with patch(
+            "api.routers.auth.get_current_user_from_token", return_value=user_id
+        ):
             mock_db.users.find_one.return_value = user_data
-            
+
             response = client.get("/api/users/me")
-            
+
             assert response.status_code == 200
             data = response.json()
             assert data["username"] is None
@@ -362,15 +371,17 @@ class TestGetCurrentUserInfo:
         user_id = ObjectId("507f1f77bcf86cd799439011")
         user_data = {
             "_id": user_id,
-            "username": "testuser"
+            "username": "testuser",
             # Missing email
         }
-        
-        with patch('api.routers.auth.get_current_user_from_token', return_value=user_id):
+
+        with patch(
+            "api.routers.auth.get_current_user_from_token", return_value=user_id
+        ):
             mock_db.users.find_one.return_value = user_data
-            
+
             response = client.get("/api/users/me")
-            
+
             assert response.status_code == 200
             data = response.json()
             assert data["email"] is None

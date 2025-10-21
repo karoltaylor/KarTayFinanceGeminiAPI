@@ -48,7 +48,7 @@ class AssetTypeMapper:
             prompt = self._build_asset_classification_prompt(asset_name.strip())
             response = self.model.generate_content(prompt)
             result = self._parse_asset_response(response.text)
-            
+
             # Validate the result
             if self._validate_asset_result(result):
                 return result
@@ -62,9 +62,9 @@ class AssetTypeMapper:
 
     def _build_asset_classification_prompt(self, asset_name: str) -> str:
         """Build prompt for asset classification."""
-        
+
         valid_asset_types = [asset_type.value for asset_type in AssetType]
-        
+
         prompt = f"""You are an asset classification expert. Classify the asset type and provide ticker symbol.
 
 ASSET NAME: {asset_name}
@@ -90,28 +90,28 @@ IMPORTANT: Return ONLY the JSON object, no additional text or explanation."""
 
         # Clean the response text
         cleaned_text = response_text.strip()
-        
+
         # Try to find JSON in the response
-        start_idx = cleaned_text.find('{')
-        end_idx = cleaned_text.rfind('}') + 1
-        
+        start_idx = cleaned_text.find("{")
+        end_idx = cleaned_text.rfind("}") + 1
+
         if start_idx == -1 or end_idx == 0:
             return None
-            
+
         json_text = cleaned_text[start_idx:end_idx]
-        
+
         try:
             result = json.loads(json_text)
-            
+
             # Ensure we have the expected structure
             if isinstance(result, dict) and "asset_type" in result:
                 return {
                     "asset_type": str(result.get("asset_type", "")).strip(),
-                    "symbol": str(result.get("symbol", "")).strip()
+                    "symbol": str(result.get("symbol", "")).strip(),
                 }
             else:
                 return None
-                
+
         except json.JSONDecodeError:
             return None
 
@@ -119,17 +119,17 @@ IMPORTANT: Return ONLY the JSON object, no additional text or explanation."""
         """Validate that the asset classification result is valid."""
         if not result or not isinstance(result, dict):
             return False
-            
+
         asset_type = result.get("asset_type", "").strip().lower()
-        
+
         # Check if asset_type is valid
         valid_types = [asset_type.value for asset_type in AssetType]
         if asset_type not in valid_types:
             return False
-            
+
         # Symbol is optional, but if present should be reasonable
         symbol = result.get("symbol", "").strip()
         if symbol and len(symbol) > 20:  # Reasonable ticker length limit
             return False
-            
+
         return True

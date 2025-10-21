@@ -35,7 +35,7 @@ class TestSettings:
     def test_validate_missing_api_key(self, monkeypatch):
         """Test validation fails when API key is missing."""
         monkeypatch.setenv("GOOGLE_API_KEY", "")
-        
+
         from importlib import reload
         from src.config import settings
 

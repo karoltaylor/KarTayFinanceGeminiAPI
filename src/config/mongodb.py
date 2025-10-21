@@ -19,7 +19,7 @@ def _get_active_env_file():
                 return env_file
         except:
             pass
-    
+
     # Fallback to ENV_FILE environment variable or .env
     return os.getenv("ENV_FILE", ".env")
 
@@ -29,41 +29,46 @@ def _load_env_once():
     # Only try to load .env files if not running in Lambda
     # In Lambda, environment variables are already set by AWS
     is_lambda = bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-    
+
     print(f"[DEBUG] Environment detection - Is Lambda: {is_lambda}")
-    print(f"[DEBUG] AWS_LAMBDA_FUNCTION_NAME: {os.getenv('AWS_LAMBDA_FUNCTION_NAME', 'Not set')}")
-    
+    print(
+        f"[DEBUG] AWS_LAMBDA_FUNCTION_NAME: {os.getenv('AWS_LAMBDA_FUNCTION_NAME', 'Not set')}"
+    )
+
     env_vars = {}
-    
+
     if not is_lambda:
         env_file = _get_active_env_file()
         print(f"[DEBUG] Loading env file: {env_file}")
-        
+
         if env_file and Path(env_file).exists():
             try:
                 # Parse the .env file manually to return the variables
-                with open(env_file, 'r', encoding='utf-8') as f:
+                with open(env_file, "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
                         # Skip empty lines and comments
-                        if not line or line.startswith('#'):
+                        if not line or line.startswith("#"):
                             continue
-                        
+
                         # Parse KEY=VALUE format
-                        if '=' in line:
-                            key, value = line.split('=', 1)
+                        if "=" in line:
+                            key, value = line.split("=", 1)
                             key = key.strip()
                             value = value.strip()
-                            
+
                             # Remove quotes if present
-                            if (value.startswith('"') and value.endswith('"')) or \
-                               (value.startswith("'") and value.endswith("'")):
+                            if (value.startswith('"') and value.endswith('"')) or (
+                                value.startswith("'") and value.endswith("'")
+                            ):
                                 value = value[1:-1]
-                            
+
                             env_vars[key] = value
-                
+
                 # Also load into environment using load_dotenv
-                load_dotenv(env_file, override=False)  # Don't override existing env vars
+                load_dotenv(
+                    env_file, override=False
+                )  # Don't override existing env vars
             except Exception as e:
                 print(f"[DEBUG] Error loading env file {env_file}: {e}")
                 return {}
@@ -72,7 +77,7 @@ def _load_env_once():
             return {}
     else:
         print("[DEBUG] Running in Lambda - skipping .env file loading")
-    
+
     return env_vars
 
 
@@ -91,12 +96,14 @@ class MongoDBConfig:
         """Get MongoDB client (singleton)."""
         if cls._client is None:
             print("[DEBUG] Creating new MongoDB client...")
-            
+
             # Get URL from environment
             url = os.getenv("MONGODB_URL")
-            
+
             # Log environment variable status (mask sensitive data)
-            print(f"[DEBUG] MONGODB_URL environment variable: {'SET' if url else 'NOT SET'}")
+            print(
+                f"[DEBUG] MONGODB_URL environment variable: {'SET' if url else 'NOT SET'}"
+            )
             if url:
                 # Mask the URL for logging
                 if "@" in url:
@@ -112,14 +119,14 @@ class MongoDBConfig:
                 for key, value in os.environ.items():
                     if key.startswith("MONGODB"):
                         print(f"[DEBUG]   {key} = {'SET' if value else 'NOT SET'}")
-            
+
             if not url:
                 raise ValueError(
                     "MONGODB_URL environment variable is not set. "
                     "For local development, set it in config.local.env. "
                     "For Lambda, ensure it's set in template.yaml parameters."
                 )
-            
+
             # PyMongo 4.x handles SSL/TLS automatically for mongodb+srv://
             # Just set a reasonable timeout
             print(f"[DEBUG] Creating MongoClient with timeout=10000ms...")
@@ -136,12 +143,12 @@ class MongoDBConfig:
         """Get MongoDB database (singleton)."""
         if cls._db is None:
             print("[DEBUG] Getting MongoDB database...")
-            
+
             client = cls.get_client()
             db_name = os.getenv("MONGODB_DATABASE", "financial_tracker")
-            
+
             print(f"[DEBUG] Database name: {db_name}")
-            
+
             if not db_name:
                 print("[ERROR] MONGODB_DATABASE is None or empty!")
                 raise ValueError(
@@ -149,7 +156,7 @@ class MongoDBConfig:
                     "For local development, set it in config.local.env. "
                     "For Lambda, ensure it's set in template.yaml parameters."
                 )
-            
+
             print(f"[DEBUG] Selecting database: {db_name}")
             cls._db = client[db_name]
             print("[DEBUG] Database selected successfully")
@@ -167,9 +174,11 @@ class MongoDBConfig:
     def get_mongodb_url(cls) -> str:
         """Get MongoDB URL from environment."""
         url = os.getenv("MONGODB_URL")
-        print(f"[DEBUG] get_mongodb_url() called - URL is {'SET' if url else 'NOT SET'}")
+        print(
+            f"[DEBUG] get_mongodb_url() called - URL is {'SET' if url else 'NOT SET'}"
+        )
         return url
-    
+
     @classmethod
     def get_mongodb_database(cls) -> str:
         """Get MongoDB database name from environment."""
@@ -181,11 +190,11 @@ class MongoDBConfig:
     def initialize_collections(cls):
         """Initialize MongoDB collections with indexes."""
         print("[DEBUG] Initializing MongoDB collections and indexes...")
-        
+
         try:
             db = cls.get_database()
             print(f"[DEBUG] Database object obtained: {type(db)}")
-            
+
             # Test connection by pinging
             print("[DEBUG] Testing connection with ping...")
             db.command("ping")
@@ -231,18 +240,18 @@ class MongoDBConfig:
         db.transactions.create_index("transaction_type")
         db.transactions.create_index([("wallet_id", 1), ("date", -1)])
         print("[DEBUG] Transactions indexes created")
-        
+
         # Create indexes for column_mapping_cache
         print("[DEBUG] Creating indexes for column_mapping_cache collection...")
         db.column_mapping_cache.create_index(
             [("user_id", 1), ("cache_key", 1), ("version", 1)],
             unique=True,
-            name="user_cache_key_version_idx"
+            name="user_cache_key_version_idx",
         )
         db.column_mapping_cache.create_index("last_used_at")
         db.column_mapping_cache.create_index("hit_count")
         print("[DEBUG] Column_mapping_cache indexes created")
-        
+
         print("[DEBUG] All indexes created successfully!")
 
 

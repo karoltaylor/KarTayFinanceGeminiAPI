@@ -13,32 +13,36 @@ router = APIRouter(prefix="/api/stats", tags=["Statistics"])
 @router.get("", summary="Get user statistics", response_model=None)
 async def get_statistics(
     user_id: ObjectId = Depends(get_current_user_from_token),
-    db: Database = Depends(get_db)
+    db: Database = Depends(get_db),
 ):
     """
     Get statistics for the authenticated user.
-    
+
     **Authentication Required:** Include `X-User-ID` header with your user ID.
-    
+
     **Returns:**
     - Total number of wallets owned by user
     - Total number of assets (shared across all users)
     - Total number of transactions from user's wallets
     - Breakdown of transactions by type
-    
+
     **Errors:**
     - 401: Invalid or missing X-User-ID header
     """
     # Get user's wallet IDs
-    user_wallets = list(db.wallets.find({
-        "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]
-    }, {"_id": 1}))
+    user_wallets = list(
+        db.wallets.find(
+            {"$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}, {"_id": 1}
+        )
+    )
     wallet_ids = [w["_id"] for w in user_wallets]
-    
+
     stats = {
         "total_wallets": len(wallet_ids),
         "total_assets": db.assets.count_documents({}),
-        "total_transactions": db.transactions.count_documents({"wallet_id": {"$in": wallet_ids}}),
+        "total_transactions": db.transactions.count_documents(
+            {"wallet_id": {"$in": wallet_ids}}
+        ),
         "transactions_by_type": {},
     }
 
@@ -58,4 +62,3 @@ async def get_statistics(
             stats["transactions_by_type"][str(trans_type)] = item["count"]
 
     return stats
-

@@ -14,8 +14,13 @@ from ..config.settings import Settings
 class ColumnMapper:
     """Maps source columns to target schema using Google GenAI."""
 
-    def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None, 
-                 db=None, user_id=None):
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model_name: Optional[str] = None,
+        db=None,
+        user_id=None,
+    ):
         """
         Initialize column mapper with Google GenAI.
 
@@ -42,11 +47,11 @@ class ColumnMapper:
     def _generate_cache_key(self, source_df: pd.DataFrame, file_type: str) -> str:
         """
         Generate cache key from column names + file type + count.
-        
+
         Args:
             source_df: Source DataFrame
             file_type: File type (csv, xlsx, xls)
-            
+
         Returns:
             SHA256 hash as cache key
         """
@@ -57,44 +62,51 @@ class ColumnMapper:
     def _get_cached_mapping(self, cache_key: str) -> Optional[Dict[str, str]]:
         """
         Retrieve mapping from cache if available.
-        
+
         Args:
             cache_key: Cache key to lookup
-            
+
         Returns:
             Cached mapping dict or None if not found
         """
         if self.db is None or self.user_id is None:
             return None
-        
+
         try:
-            cache_entry = self.db.column_mapping_cache.find_one({
-                "user_id": self.user_id,
-                "cache_key": cache_key,
-                "version": self.cache_version
-            })
-            
+            cache_entry = self.db.column_mapping_cache.find_one(
+                {
+                    "user_id": self.user_id,
+                    "cache_key": cache_key,
+                    "version": self.cache_version,
+                }
+            )
+
             if cache_entry:
                 # Update hit count and last used timestamp
                 self.db.column_mapping_cache.update_one(
                     {"_id": cache_entry["_id"]},
                     {
                         "$inc": {"hit_count": 1},
-                        "$set": {"last_used_at": datetime.now(UTC)}
-                    }
+                        "$set": {"last_used_at": datetime.now(UTC)},
+                    },
                 )
                 return cache_entry["mapping"]
         except Exception as e:
             # Log error but don't fail - just skip cache
             print(f"Cache lookup failed: {e}")
-        
+
         return None
 
-    def _store_mapping_cache(self, cache_key: str, source_df: pd.DataFrame, 
-                             file_type: str, mapping: Dict[str, str]):
+    def _store_mapping_cache(
+        self,
+        cache_key: str,
+        source_df: pd.DataFrame,
+        file_type: str,
+        mapping: Dict[str, str],
+    ):
         """
         Store successful mapping in cache.
-        
+
         Args:
             cache_key: Cache key
             source_df: Source DataFrame
@@ -103,7 +115,7 @@ class ColumnMapper:
         """
         if self.db is None or self.user_id is None:
             return
-        
+
         try:
             cache_doc = {
                 "user_id": self.user_id,
@@ -115,21 +127,28 @@ class ColumnMapper:
                 "version": self.cache_version,
                 "hit_count": 0,
                 "created_at": datetime.now(UTC),
-                "last_used_at": datetime.now(UTC)
+                "last_used_at": datetime.now(UTC),
             }
-            
+
             self.db.column_mapping_cache.update_one(
-                {"user_id": self.user_id, "cache_key": cache_key, "version": self.cache_version},
+                {
+                    "user_id": self.user_id,
+                    "cache_key": cache_key,
+                    "version": self.cache_version,
+                },
                 {"$set": cache_doc},
-                upsert=True
+                upsert=True,
             )
         except Exception as e:
             # Log error but don't fail - caching is optional
             print(f"Cache storage failed: {e}")
 
     def map_columns(
-        self, source_df: pd.DataFrame, target_columns: List[str], sample_rows: int = 5,
-        file_type: str = "csv"
+        self,
+        source_df: pd.DataFrame,
+        target_columns: List[str],
+        sample_rows: int = 5,
+        file_type: str = "csv",
     ) -> Dict[str, str]:
         """
         Map source DataFrame columns to target schema columns.
@@ -150,7 +169,7 @@ class ColumnMapper:
         # Try cache first
         cache_key = self._generate_cache_key(source_df, file_type)
         cached_mapping = self._get_cached_mapping(cache_key)
-        
+
         if cached_mapping:
             return cached_mapping
 

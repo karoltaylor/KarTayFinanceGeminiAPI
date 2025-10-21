@@ -76,8 +76,12 @@ class User(BaseModel):
     email: str = Field(..., min_length=3, max_length=255, description="User email")
     username: str = Field(..., min_length=3, max_length=50, description="Username")
     full_name: Optional[str] = Field(None, max_length=200, description="Full name")
-    oauth_provider: Optional[str] = Field(None, max_length=50, description="OAuth provider (google, meta, etc.)")
-    oauth_id: Optional[str] = Field(None, max_length=255, description="OAuth provider's user ID")
+    oauth_provider: Optional[str] = Field(
+        None, max_length=50, description="OAuth provider (google, meta, etc.)"
+    )
+    oauth_id: Optional[str] = Field(
+        None, max_length=255, description="OAuth provider's user ID"
+    )
     is_active: bool = Field(default=True, description="Is user active")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -87,53 +91,53 @@ class User(BaseModel):
     def validate_email(cls, v: str) -> str:
         """Validate email format."""
         v = v.strip().lower()
-        
+
         # Basic email validation
         if not v:
             raise ValueError("Email cannot be empty")
-        
+
         if "@" not in v:
             raise ValueError("Email must contain @")
-        
+
         parts = v.split("@")
         if len(parts) != 2:
             raise ValueError("Email must have exactly one @")
-        
+
         local, domain = parts
-        
+
         if not local:
             raise ValueError("Email local part cannot be empty")
-        
+
         if not domain:
             raise ValueError("Email domain cannot be empty")
-        
+
         if "." not in domain:
             raise ValueError("Email domain must contain a dot")
-        
+
         # Check for common invalid patterns
         if v.startswith("@") or v.endswith("@"):
             raise ValueError("Invalid email format")
-        
+
         if v.startswith(".") or v.endswith("."):
             raise ValueError("Invalid email format")
-        
+
         if ".." in v:
             raise ValueError("Invalid email format")
-        
+
         # Additional strict validation
         if domain.startswith(".") or domain.endswith("."):
             raise ValueError("Invalid email format")
-        
+
         # Check for valid domain structure (must have at least 2 parts after the dot)
         domain_parts = domain.split(".")
         if len(domain_parts) < 2:
             raise ValueError("Invalid email format")
-        
+
         # Each domain part must be non-empty
         for part in domain_parts:
             if not part:
                 raise ValueError("Invalid email format")
-        
+
         return v
 
     @field_validator("username")
@@ -155,9 +159,13 @@ class Wallet(BaseModel):
     )
 
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
-    user_id: PyObjectId = Field(..., description="Reference to User who owns this wallet")
+    user_id: PyObjectId = Field(
+        ..., description="Reference to User who owns this wallet"
+    )
     name: str = Field(..., min_length=1, max_length=200, description="Wallet name")
-    description: Optional[str] = Field(None, max_length=1000, description="Wallet description")
+    description: Optional[str] = Field(
+        None, max_length=1000, description="Wallet description"
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -181,9 +189,15 @@ class Asset(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     asset_name: str = Field(..., min_length=1, max_length=200, description="Asset name")
     asset_type: AssetType = Field(..., description="Type of asset")
-    symbol: Optional[str] = Field(None, max_length=20, description="Asset symbol/ticker")
-    url: Optional[str] = Field(None, max_length=500, description="URL to get current value")
-    description: Optional[str] = Field(None, max_length=1000, description="Asset description")
+    symbol: Optional[str] = Field(
+        None, max_length=20, description="Asset symbol/ticker"
+    )
+    url: Optional[str] = Field(
+        None, max_length=500, description="URL to get current value"
+    )
+    description: Optional[str] = Field(
+        None, max_length=1000, description="Asset description"
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -243,7 +257,7 @@ class AssetCurrentValue(BaseModel):
             v = v.strip()
             if not v:
                 raise ValueError("Date cannot be empty")
-            
+
             # Try common date formats with strict validation
             for fmt in [
                 "%Y-%m-%d",
@@ -257,15 +271,17 @@ class AssetCurrentValue(BaseModel):
                     parsed_date = datetime.strptime(v, fmt)
                     # Additional validation for reasonable date ranges
                     if parsed_date.year < 1900 or parsed_date.year > 2100:
-                        raise ValueError(f"Date year {parsed_date.year} is out of reasonable range")
-                    
+                        raise ValueError(
+                            f"Date year {parsed_date.year} is out of reasonable range"
+                        )
+
                     # Additional validation for month/day ranges
                     if parsed_date.month < 1 or parsed_date.month > 12:
                         raise ValueError(f"Invalid month: {parsed_date.month}")
-                    
+
                     if parsed_date.day < 1 or parsed_date.day > 31:
                         raise ValueError(f"Invalid day: {parsed_date.day}")
-                    
+
                     return parsed_date
                 except ValueError as e:
                     if "unconverted data remains" in str(e) or "time data" in str(e):
@@ -313,7 +329,7 @@ class Transaction(BaseModel):
     def parse_date(cls, v):
         """Parse various date formats."""
         import pandas as pd
-        
+
         if isinstance(v, datetime):
             return v
         if isinstance(v, str):
@@ -331,13 +347,13 @@ class Transaction(BaseModel):
                 except ValueError:
                     continue
             raise ValueError(f"Unable to parse date: {v}")
-        
+
         # Handle pandas datetime objects (including NaT)
-        if hasattr(v, '__class__') and 'pandas' in str(type(v)):
+        if hasattr(v, "__class__") and "pandas" in str(type(v)):
             if pd.isna(v):
                 raise ValueError(f"Invalid date value: {v}")
             return v
-            
+
         raise ValueError(f"Invalid date value: {v}")
 
     @field_validator("transaction_amount")
@@ -383,12 +399,12 @@ class Transaction(BaseModel):
 
 class TransactionError(BaseModel):
     """Model for storing failed transaction imports."""
-    
+
     model_config = ConfigDict(
         populate_by_name=True,
         json_encoders={ObjectId: str},
     )
-    
+
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     user_id: PyObjectId = Field(..., description="User who attempted the import")
     wallet_name: str = Field(..., description="Target wallet name")
@@ -405,19 +421,23 @@ class TransactionError(BaseModel):
 
 class ColumnMappingCache(BaseModel):
     """Cache for column mappings to avoid redundant AI calls."""
-    
+
     model_config = ConfigDict(
         populate_by_name=True,
         json_encoders={ObjectId: str},
     )
-    
+
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     user_id: PyObjectId = Field(..., description="User who owns this cache entry")
-    cache_key: str = Field(..., description="Hash of column_names + file_type + column_count")
+    cache_key: str = Field(
+        ..., description="Hash of column_names + file_type + column_count"
+    )
     column_names: List[str] = Field(..., description="Original column names from file")
     file_type: str = Field(..., description="File type (csv, xlsx, xls)")
     column_count: int = Field(..., description="Number of columns")
-    mapping: Dict[str, Optional[str]] = Field(..., description="Column mapping dictionary")
+    mapping: Dict[str, Optional[str]] = Field(
+        ..., description="Column mapping dictionary"
+    )
     version: int = Field(default=1, description="Cache version for invalidation")
     hit_count: int = Field(default=0, description="Number of times this cache was used")
     created_at: datetime = Field(default_factory=datetime.utcnow)
