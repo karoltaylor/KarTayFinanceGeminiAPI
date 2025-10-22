@@ -138,7 +138,9 @@ async def log_health_check():
             for file in os.listdir(LOGS_DIR):
                 if file.endswith(".log"):
                     file_path = os.path.join(LOGS_DIR, file)
-                    file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+                    file_size = (
+                        os.path.getsize(file_path) if os.path.exists(file_path) else 0
+                    )
                     log_files.append(
                         {
                             "name": file,

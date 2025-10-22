@@ -29,7 +29,9 @@ class PyObjectId(ObjectId):
                 core_schema.is_instance_schema(ObjectId),
                 core_schema.no_info_plain_validator_function(cls.validate),
             ],
-            serialization=core_schema.plain_serializer_function_ser_schema(lambda x: str(x)),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda x: str(x)
+            ),
         )
 
 
@@ -74,8 +76,12 @@ class User(BaseModel):
     email: str = Field(..., min_length=3, max_length=255, description="User email")
     username: str = Field(..., min_length=3, max_length=50, description="Username")
     full_name: Optional[str] = Field(None, max_length=200, description="Full name")
-    oauth_provider: Optional[str] = Field(None, max_length=50, description="OAuth provider (google, meta, etc.)")
-    oauth_id: Optional[str] = Field(None, max_length=255, description="OAuth provider's user ID")
+    oauth_provider: Optional[str] = Field(
+        None, max_length=50, description="OAuth provider (google, meta, etc.)"
+    )
+    oauth_id: Optional[str] = Field(
+        None, max_length=255, description="OAuth provider's user ID"
+    )
     is_active: bool = Field(default=True, description="Is user active")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -153,9 +159,13 @@ class Wallet(BaseModel):
     )
 
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
-    user_id: PyObjectId = Field(..., description="Reference to User who owns this wallet")
+    user_id: PyObjectId = Field(
+        ..., description="Reference to User who owns this wallet"
+    )
     name: str = Field(..., min_length=1, max_length=200, description="Wallet name")
-    description: Optional[str] = Field(None, max_length=1000, description="Wallet description")
+    description: Optional[str] = Field(
+        None, max_length=1000, description="Wallet description"
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -179,9 +189,15 @@ class Asset(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     asset_name: str = Field(..., min_length=1, max_length=200, description="Asset name")
     asset_type: AssetType = Field(..., description="Type of asset")
-    symbol: Optional[str] = Field(None, max_length=20, description="Asset symbol/ticker")
-    url: Optional[str] = Field(None, max_length=500, description="URL to get current value")
-    description: Optional[str] = Field(None, max_length=1000, description="Asset description")
+    symbol: Optional[str] = Field(
+        None, max_length=20, description="Asset symbol/ticker"
+    )
+    url: Optional[str] = Field(
+        None, max_length=500, description="URL to get current value"
+    )
+    description: Optional[str] = Field(
+        None, max_length=1000, description="Asset description"
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -217,7 +233,9 @@ class AssetCurrentValue(BaseModel):
     asset_id: PyObjectId = Field(..., description="Reference to Asset")
     date: datetime = Field(..., description="Date of the price")
     price: float = Field(..., gt=0, description="Price of the asset")
-    currency: str = Field(..., min_length=3, max_length=3, description="Currency code (ISO 4217)")
+    currency: str = Field(
+        ..., min_length=3, max_length=3, description="Currency code (ISO 4217)"
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     @field_validator("currency")
@@ -253,7 +271,9 @@ class AssetCurrentValue(BaseModel):
                     parsed_date = datetime.strptime(v, fmt)
                     # Additional validation for reasonable date ranges
                     if parsed_date.year < 1900 or parsed_date.year > 2100:
-                        raise ValueError(f"Date year {parsed_date.year} is out of reasonable range")
+                        raise ValueError(
+                            f"Date year {parsed_date.year} is out of reasonable range"
+                        )
 
                     # Additional validation for month/day ranges
                     if parsed_date.month < 1 or parsed_date.month > 12:
@@ -287,7 +307,9 @@ class Transaction(BaseModel):
     volume: float = Field(..., ge=0, description="Quantity/volume of assets")
     item_price: float = Field(..., ge=0, description="Price per item at transaction")
     transaction_amount: float = Field(..., description="Total transaction amount")
-    currency: str = Field(..., min_length=3, max_length=3, description="Currency code (ISO 4217)")
+    currency: str = Field(
+        ..., min_length=3, max_length=3, description="Currency code (ISO 4217)"
+    )
     fee: float = Field(default=0.0, ge=0, description="Transaction fee")
     notes: Optional[str] = Field(None, max_length=1000, description="Transaction notes")
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -407,11 +429,15 @@ class ColumnMappingCache(BaseModel):
 
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     user_id: PyObjectId = Field(..., description="User who owns this cache entry")
-    cache_key: str = Field(..., description="Hash of column_names + file_type + column_count")
+    cache_key: str = Field(
+        ..., description="Hash of column_names + file_type + column_count"
+    )
     column_names: List[str] = Field(..., description="Original column names from file")
     file_type: str = Field(..., description="File type (csv, xlsx, xls)")
     column_count: int = Field(..., description="Number of columns")
-    mapping: Dict[str, Optional[str]] = Field(..., description="Column mapping dictionary")
+    mapping: Dict[str, Optional[str]] = Field(
+        ..., description="Column mapping dictionary"
+    )
     version: int = Field(default=1, description="Cache version for invalidation")
     hit_count: int = Field(default=0, description="Number of times this cache was used")
     created_at: datetime = Field(default_factory=datetime.utcnow)

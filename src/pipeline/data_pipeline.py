@@ -32,8 +32,12 @@ class DataPipeline:
             user_id: User ID for per-user cache isolation (optional)
         """
         self.file_loader = FileLoaderFactory()
-        self.column_mapper = ColumnMapper(api_key=api_key, model_name=model_name, db=db, user_id=user_id)
-        self.transaction_mapper = TransactionMapper(api_key=api_key, model_name=model_name)
+        self.column_mapper = ColumnMapper(
+            api_key=api_key, model_name=model_name, db=db, user_id=user_id
+        )
+        self.transaction_mapper = TransactionMapper(
+            api_key=api_key, model_name=model_name
+        )
         self.target_columns = Settings.TARGET_COLUMNS
 
     def process_file_to_transactions(
@@ -73,10 +77,14 @@ class DataPipeline:
 
         # Step 2: Map columns using AI (with caching based on file type)
         file_type = filepath.suffix.lower().lstrip(".")
-        column_mapping = self.column_mapper.map_columns(table_df, self.target_columns, file_type=file_type)
+        column_mapping = self.column_mapper.map_columns(
+            table_df, self.target_columns, file_type=file_type
+        )
 
         # Step 3: Apply mapping
-        mapped_df = self.column_mapper.apply_mapping(table_df, column_mapping, default_values)
+        mapped_df = self.column_mapper.apply_mapping(
+            table_df, column_mapping, default_values
+        )
 
         # Step 4: Convert to Transaction models (returns transactions and errors)
         transactions, error_records = self.transaction_mapper.dataframe_to_transactions(

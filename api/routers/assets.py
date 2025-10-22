@@ -12,8 +12,12 @@ router = APIRouter(prefix="/api/assets", tags=["Assets"])
 
 @router.get("", summary="List assets")
 async def list_assets(
-    asset_type: Annotated[Optional[AssetType], Query(description="Filter by asset type")] = None,
-    limit: Annotated[int, Query(description="Maximum number of assets to return", ge=1, le=1000)] = 100,
+    asset_type: Annotated[
+        Optional[AssetType], Query(description="Filter by asset type")
+    ] = None,
+    limit: Annotated[
+        int, Query(description="Maximum number of assets to return", ge=1, le=1000)
+    ] = 100,
     skip: Annotated[int, Query(description="Number of assets to skip", ge=0)] = 0,
     db: Database = Depends(get_db),
 ):

@@ -22,16 +22,24 @@ router = APIRouter(prefix="/api/users", tags=["Authentication"])
 class UserRegister(BaseModel):
     """User registration request for OAuth providers (Google, Meta, etc.)."""
 
-    email: str = Field(..., description="User email from OAuth provider", min_length=3, max_length=255)
+    email: str = Field(
+        ..., description="User email from OAuth provider", min_length=3, max_length=255
+    )
     username: str = Field(
         ...,
         description="Username (can be derived from email)",
         min_length=3,
         max_length=50,
     )
-    full_name: Optional[str] = Field(None, description="User's full name", max_length=200)
-    oauth_provider: Optional[str] = Field(None, description="OAuth provider (google, meta, etc.)", max_length=50)
-    oauth_id: Optional[str] = Field(None, description="Unique ID from OAuth provider", max_length=255)
+    full_name: Optional[str] = Field(
+        None, description="User's full name", max_length=200
+    )
+    oauth_provider: Optional[str] = Field(
+        None, description="OAuth provider (google, meta, etc.)", max_length=50
+    )
+    oauth_id: Optional[str] = Field(
+        None, description="Unique ID from OAuth provider", max_length=255
+    )
 
 
 # ==============================================================================
@@ -109,12 +117,16 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
 
         # Sanitize username - replace spaces and invalid chars with underscores
         sanitized_username = user_data.username.strip().lower()
-        sanitized_username = "".join(c if (c.isalnum() or c in "_-") else "_" for c in sanitized_username)
+        sanitized_username = "".join(
+            c if (c.isalnum() or c in "_-") else "_" for c in sanitized_username
+        )
 
         # If username is still invalid, generate from email
         if not sanitized_username or len(sanitized_username) < 3:
             sanitized_username = user_data.email.split("@")[0].lower()
-            sanitized_username = "".join(c if (c.isalnum() or c in "_-") else "_" for c in sanitized_username)
+            sanitized_username = "".join(
+                c if (c.isalnum() or c in "_-") else "_" for c in sanitized_username
+            )
 
         # Check if username is taken, add suffix if needed
         base_username = sanitized_username

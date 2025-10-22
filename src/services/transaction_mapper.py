@@ -95,9 +95,14 @@ class TransactionMapper:
             # Fill missing asset_price values
             mask = pd.isna(df["asset_price"]) | (df["asset_price"] == 0)
             if mask.any():
-                valid_calc = pd.notna(df["volume"]) & pd.notna(df["transaction_amount"]) & (df["volume"] != 0)
+                valid_calc = (
+                    pd.notna(df["volume"])
+                    & pd.notna(df["transaction_amount"])
+                    & (df["volume"] != 0)
+                )
                 df.loc[mask & valid_calc, "asset_price"] = (
-                    df.loc[mask & valid_calc, "transaction_amount"] / df.loc[mask & valid_calc, "volume"]
+                    df.loc[mask & valid_calc, "transaction_amount"]
+                    / df.loc[mask & valid_calc, "volume"]
                 )
 
         # Calculate transaction_amount if missing
@@ -108,9 +113,14 @@ class TransactionMapper:
             # Fill missing transaction_amount values
             mask = pd.isna(df["transaction_amount"]) | (df["transaction_amount"] == 0)
             if mask.any():
-                valid_calc = pd.notna(df["volume"]) & pd.notna(df["asset_price"]) & (df["volume"] != 0)
+                valid_calc = (
+                    pd.notna(df["volume"])
+                    & pd.notna(df["asset_price"])
+                    & (df["volume"] != 0)
+                )
                 df.loc[mask & valid_calc, "transaction_amount"] = (
-                    df.loc[mask & valid_calc, "asset_price"] * df.loc[mask & valid_calc, "volume"]
+                    df.loc[mask & valid_calc, "asset_price"]
+                    * df.loc[mask & valid_calc, "volume"]
                 )
 
         # Ensure fee column exists with default value
@@ -134,7 +144,9 @@ class TransactionMapper:
 
         return df
 
-    def get_or_create_wallet(self, wallet_name: str, user_id: PyObjectId, wallets_collection=None) -> PyObjectId:
+    def get_or_create_wallet(
+        self, wallet_name: str, user_id: PyObjectId, wallets_collection=None
+    ) -> PyObjectId:
         """
         Get or create a wallet by name for a specific user.
 
@@ -166,7 +178,9 @@ class TransactionMapper:
 
             # Create new wallet in DB
             wallet = Wallet(user_id=user_id, name=wallet_name)
-            result = wallets_collection.insert_one(wallet.model_dump(by_alias=True, exclude={"id"}, mode="python"))
+            result = wallets_collection.insert_one(
+                wallet.model_dump(by_alias=True, exclude={"id"}, mode="python")
+            )
             wallet_id = PyObjectId(result.inserted_id)
             self._wallet_cache[cache_key] = wallet_id
             return wallet_id
@@ -221,10 +235,16 @@ class TransactionMapper:
                 )
             else:
                 # Fallback to provided values or OTHER if AI fails
-                fallback_asset_type = asset_type if asset_type != AssetType.OTHER else AssetType.OTHER
-                asset = Asset(asset_name=asset_name, asset_type=fallback_asset_type, symbol=symbol)
+                fallback_asset_type = (
+                    asset_type if asset_type != AssetType.OTHER else AssetType.OTHER
+                )
+                asset = Asset(
+                    asset_name=asset_name, asset_type=fallback_asset_type, symbol=symbol
+                )
 
-            result = assets_collection.insert_one(asset.model_dump(by_alias=True, exclude={"id"}, mode="python"))
+            result = assets_collection.insert_one(
+                asset.model_dump(by_alias=True, exclude={"id"}, mode="python")
+            )
             asset_id = PyObjectId(result.inserted_id)
             self._asset_cache[cache_key] = asset_id
             return asset_id
@@ -267,31 +287,49 @@ class TransactionMapper:
                 record = TransactionRecord(**row.to_dict())
 
                 # Determine transaction type from the record
-                detected_transaction_type = self._parse_transaction_type(record.transaction_type)
+                detected_transaction_type = self._parse_transaction_type(
+                    record.transaction_type
+                )
 
                 # Determine asset type automatically with caching and fallback
                 asset_name_lower = record.asset_name.lower()
 
                 # Simple heuristic-based detection to reduce API calls
-                if any(keyword in asset_name_lower for keyword in ["akcji", "stock", "equity", "share"]):
+                if any(
+                    keyword in asset_name_lower
+                    for keyword in ["akcji", "stock", "equity", "share"]
+                ):
                     detected_asset_type = AssetType.STOCK
-                elif any(keyword in asset_name_lower for keyword in ["obligacje", "bond", "debt"]):
+                elif any(
+                    keyword in asset_name_lower
+                    for keyword in ["obligacje", "bond", "debt"]
+                ):
                     detected_asset_type = AssetType.BOND
-                elif any(keyword in asset_name_lower for keyword in ["krypto", "crypto", "bitcoin", "ethereum"]):
+                elif any(
+                    keyword in asset_name_lower
+                    for keyword in ["krypto", "crypto", "bitcoin", "ethereum"]
+                ):
                     detected_asset_type = AssetType.CRYPTOCURRENCY
-                elif any(keyword in asset_name_lower for keyword in ["złoto", "gold", "srebro", "silver", "commodity"]):
+                elif any(
+                    keyword in asset_name_lower
+                    for keyword in ["złoto", "gold", "srebro", "silver", "commodity"]
+                ):
                     detected_asset_type = AssetType.COMMODITY
                 else:
                     # Only use AI for unclear cases, with fallback
                     try:
-                        asset_info = self.asset_type_mapper.infer_asset_info(record.asset_name)
+                        asset_info = self.asset_type_mapper.infer_asset_info(
+                            record.asset_name
+                        )
                         if asset_info and "asset_type" in asset_info:
                             detected_asset_type = AssetType(asset_info["asset_type"])
                         else:
                             detected_asset_type = AssetType.OTHER
                     except Exception as e:
                         # Fallback to OTHER if AI fails (rate limits, etc.)
-                        print(f"Warning: Asset type inference failed for '{record.asset_name}': {e}")
+                        print(
+                            f"Warning: Asset type inference failed for '{record.asset_name}': {e}"
+                        )
                         detected_asset_type = AssetType.OTHER
 
                 # Get or create asset
@@ -411,7 +449,9 @@ class TransactionMapper:
 
         return transactions
 
-    def insert_transactions(self, transactions: List[Transaction], transactions_collection) -> List[ObjectId]:
+    def insert_transactions(
+        self, transactions: List[Transaction], transactions_collection
+    ) -> List[ObjectId]:
         """
         Insert transactions into MongoDB.
 
@@ -426,7 +466,10 @@ class TransactionMapper:
             return []
 
         # Convert to dicts for MongoDB
-        transaction_dicts = [t.model_dump(by_alias=True, exclude={"id"}, mode="python") for t in transactions]
+        transaction_dicts = [
+            t.model_dump(by_alias=True, exclude={"id"}, mode="python")
+            for t in transactions
+        ]
 
         # Insert into MongoDB
         result = transactions_collection.insert_many(transaction_dicts)

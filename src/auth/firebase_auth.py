@@ -25,7 +25,9 @@ def _initialize_firebase():
             # Initialize with service account JSON file
             cred = credentials.Certificate(service_account_path)
             initialize_app(cred)
-            print(f"[INFO] Firebase initialized with service account: {service_account_path}")
+            print(
+                f"[INFO] Firebase initialized with service account: {service_account_path}"
+            )
         else:
             # Initialize with default credentials (for GCP/Cloud Run environments)
             # or use Application Default Credentials
@@ -48,7 +50,9 @@ def _initialize_firebase():
 
 
 async def verify_firebase_token(
-    authorization: Optional[str] = Header(None, description="Bearer {firebase_id_token}")
+    authorization: Optional[str] = Header(
+        None, description="Bearer {firebase_id_token}"
+    )
 ) -> Dict[str, Any]:
     """
     Verify Firebase ID token from Authorization header.
@@ -131,7 +135,9 @@ async def get_current_user_from_token(
 
     if not user:
         # Auto-register user on first API call with Firebase token
-        print(f"[INFO] Auto-registering new user from Firebase: {firebase_user['email']}")
+        print(
+            f"[INFO] Auto-registering new user from Firebase: {firebase_user['email']}"
+        )
 
         # Generate username from email
         email = firebase_user["email"]

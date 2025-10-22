@@ -22,7 +22,9 @@ class WalletCreate(BaseModel):
     """Request model for creating a wallet."""
 
     name: str = Field(..., min_length=1, max_length=200, description="Wallet name")
-    description: Optional[str] = Field(None, max_length=1000, description="Wallet description")
+    description: Optional[str] = Field(
+        None, max_length=1000, description="Wallet description"
+    )
 
 
 # ==============================================================================
@@ -32,7 +34,9 @@ class WalletCreate(BaseModel):
 
 @router.get("", summary="List user's wallets", response_model=None)
 async def list_wallets(
-    limit: Annotated[int, Query(description="Maximum number of wallets to return", ge=1, le=1000)] = 100,
+    limit: Annotated[
+        int, Query(description="Maximum number of wallets to return", ge=1, le=1000)
+    ] = 100,
     skip: Annotated[int, Query(description="Number of wallets to skip", ge=0)] = 0,
     user_id: ObjectId = Depends(get_current_user_from_token),
     db: Database = Depends(get_db),
@@ -55,7 +59,11 @@ async def list_wallets(
     - 401: Invalid or missing Firebase token
     """
     # Query for wallets - support both ObjectId and string formats for backwards compatibility
-    wallets = list(db.wallets.find({"$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}).skip(skip).limit(limit))
+    wallets = list(
+        db.wallets.find({"$or": [{"user_id": user_id}, {"user_id": str(user_id)}]})
+        .skip(skip)
+        .limit(limit)
+    )
 
     # Convert ObjectId to string for JSON serialization
     for wallet in wallets:
@@ -170,10 +178,14 @@ async def delete_wallet(
             }
         )
         if not wallet:
-            raise HTTPException(status_code=404, detail="Wallet not found or not owned by user")
+            raise HTTPException(
+                status_code=404, detail="Wallet not found or not owned by user"
+            )
 
         # Count and delete transactions associated with this wallet
-        transaction_count = db.transactions.count_documents({"wallet_id": wallet_obj_id})
+        transaction_count = db.transactions.count_documents(
+            {"wallet_id": wallet_obj_id}
+        )
         if transaction_count > 0:
             db.transactions.delete_many({"wallet_id": wallet_obj_id})
 

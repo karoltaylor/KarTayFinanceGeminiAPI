@@ -166,9 +166,13 @@ class CSVLoader(BaseFileLoader):
 
         # Fallback: try with default settings
         try:
-            df = pd.read_csv(filepath, header=None, on_bad_lines="skip", encoding="utf-8")
+            df = pd.read_csv(
+                filepath, header=None, on_bad_lines="skip", encoding="utf-8"
+            )
             return df
         except UnicodeDecodeError:
             # Try different encoding
-            df = pd.read_csv(filepath, header=None, on_bad_lines="skip", encoding="latin-1")
+            df = pd.read_csv(
+                filepath, header=None, on_bad_lines="skip", encoding="latin-1"
+            )
             return df

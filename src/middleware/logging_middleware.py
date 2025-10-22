@@ -56,7 +56,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             }
 
             # Add request body for certain endpoints (be careful with sensitive data)
-            if request.method in ["POST", "PUT", "PATCH"] and self._should_log_body(request):
+            if request.method in ["POST", "PUT", "PATCH"] and self._should_log_body(
+                request
+            ):
                 try:
                     body = await request.body()
                     if body:

@@ -131,7 +131,9 @@ async def enforce_https(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
 
     if Settings.ENFORCE_HTTPS:
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
 
     return response
 
