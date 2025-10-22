@@ -16,13 +16,32 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         self.log_requests = log_requests
         self.log_responses = log_responses
 
+    def _extract_user_id_from_token(self, auth_header: str) -> str | None:
+        """Extract user_id from Firebase token (simplified extraction for logging)."""
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return None
+
+        try:
+            # This is a simplified extraction for logging purposes only
+            # We don't verify the token here - that's done by the auth dependency
+            token = auth_header.split("Bearer ", 1)[1].strip()
+            if not token:
+                return None
+
+            # For logging, we'll just use a truncated version of the token
+            # In a real implementation, you might decode the JWT to get the user_id
+            # But for security reasons, we'll just use a hash or truncated version
+            return f"user_{hash(token) % 10000:04d}"
+        except Exception:
+            return None
+
     async def dispatch(self, request: Request, call_next):
         """Process request and response with logging."""
         start_time = time.time()
 
         # Extract user information from headers
-        user_id = request.headers.get("X-User-ID")
         auth_header = request.headers.get("Authorization")
+        user_id = self._extract_user_id_from_token(auth_header)
 
         # Log incoming request
         if self.log_requests:
@@ -37,9 +56,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             }
 
             # Add request body for certain endpoints (be careful with sensitive data)
-            if request.method in ["POST", "PUT", "PATCH"] and self._should_log_body(
-                request
-            ):
+            if request.method in ["POST", "PUT", "PATCH"] and self._should_log_body(request):
                 try:
                     body = await request.body()
                     if body:

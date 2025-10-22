@@ -22,9 +22,7 @@ class FileLoaderFactory:
         self._loaders: List[BaseFileLoader] = [CSVLoader(), ExcelLoader()]
         self.detect_header = detect_header
 
-    def load_file(
-        self, filepath: str | Path, detect_header: Optional[bool] = None
-    ) -> pd.DataFrame:
+    def load_file(self, filepath: str | Path, detect_header: Optional[bool] = None) -> pd.DataFrame:
         """
         Load a file using the appropriate loader with automatic header detection.
 
@@ -50,16 +48,11 @@ class FileLoaderFactory:
                 break
 
         if loader is None:
-            raise ValueError(
-                f"Unsupported file type: {extension}. "
-                f"Supported types: .csv, .txt, .xls, .xlsx"
-            )
+            raise ValueError(f"Unsupported file type: {extension}. " f"Supported types: .csv, .txt, .xls, .xlsx")
 
         return self._load_with_header_detection(loader, filepath)
 
-    def _load_with_header_detection(
-        self, loader: BaseFileLoader, filepath: Path
-    ) -> pd.DataFrame:
+    def _load_with_header_detection(self, loader: BaseFileLoader, filepath: Path) -> pd.DataFrame:
         """
         Load file with automatic header detection.
 

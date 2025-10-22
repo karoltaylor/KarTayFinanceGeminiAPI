@@ -37,9 +37,7 @@ class ColumnMapper:
         self.cache_version = 1  # Increment when changing mapping logic
 
         if not self.api_key or not self.api_key.strip():
-            raise ValueError(
-                "Google API key is required. Set GOOGLE_API_KEY environment variable."
-            )
+            raise ValueError("Google API key is required. Set GOOGLE_API_KEY environment variable.")
 
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel(self.model_name)
@@ -325,8 +323,7 @@ Now provide the mapping:"""
         for target, source in mapping.items():
             if source is not None and source not in source_columns:
                 raise ValueError(
-                    f"Mapping references non-existent source column '{source}' "
-                    f"for target column '{target}'"
+                    f"Mapping references non-existent source column '{source}' " f"for target column '{target}'"
                 )
 
     def apply_mapping(

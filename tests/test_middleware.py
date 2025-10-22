@@ -208,9 +208,10 @@ class TestLoggingMiddlewareDispatch:
         self, logging_middleware, mock_request, mock_response
     ):
         """Test logging with user ID header."""
+        user_id = "507f1f77bcf86cd799439011"
         mock_request.headers = {
             "content-type": "application/json",
-            "x-user-id": "507f1f77bcf86cd799439011",
+            "authorization": f"Bearer {user_id}",
         }
 
         async def mock_call_next(request):

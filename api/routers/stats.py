@@ -38,7 +38,8 @@ async def get_statistics(
     """
     Get statistics for the authenticated user.
 
-    **Authentication Required:** Include `X-User-ID` header with your user ID.
+    **Authentication Required:** Include Firebase ID token in Authorization header:
+    `Authorization: Bearer <firebase_token>`
 
     **Returns:**
     - Total number of wallets owned by user
@@ -47,22 +48,16 @@ async def get_statistics(
     - Breakdown of transactions by type
 
     **Errors:**
-    - 401: Invalid or missing X-User-ID header
+    - 401: Invalid or missing Firebase token
     """
     # Get user's wallet IDs
-    user_wallets = list(
-        db.wallets.find(
-            {"$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}, {"_id": 1}
-        )
-    )
+    user_wallets = list(db.wallets.find({"$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}, {"_id": 1}))
     wallet_ids = [w["_id"] for w in user_wallets]
 
     stats = {
         "total_wallets": len(wallet_ids),
         "total_assets": db.assets.count_documents({}),
-        "total_transactions": db.transactions.count_documents(
-            {"wallet_id": {"$in": wallet_ids}}
-        ),
+        "total_transactions": db.transactions.count_documents({"wallet_id": {"$in": wallet_ids}}),
         "transactions_by_type": {},
     }
 
@@ -109,11 +104,7 @@ async def get_asset_type_percentages(
     - 404: No transactions found for user
     """
     # Get user's wallet IDs
-    user_wallets = list(
-        db.wallets.find(
-            {"$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}, {"_id": 1}
-        )
-    )
+    user_wallets = list(db.wallets.find({"$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}, {"_id": 1}))
     wallet_ids = [w["_id"] for w in user_wallets]
 
     if not wallet_ids:
@@ -193,11 +184,7 @@ async def get_asset_type_percentages(
     asset_type_breakdown = []
     for stat in asset_type_stats:
         asset_type = stat["_id"]
-        percentage = (
-            (stat["total_value"] / total_portfolio_value * 100)
-            if total_portfolio_value > 0
-            else 0.0
-        )
+        percentage = (stat["total_value"] / total_portfolio_value * 100) if total_portfolio_value > 0 else 0.0
 
         asset_type_breakdown.append(
             AssetTypePercentage(

@@ -23,9 +23,7 @@ class AssetTypeMapper:
         self.model_name = model_name if model_name is not None else Settings.GENAI_MODEL
 
         if not self.api_key or not self.api_key.strip():
-            raise ValueError(
-                "Google API key is required. Set GOOGLE_API_KEY environment variable."
-            )
+            raise ValueError("Google API key is required. Set GOOGLE_API_KEY environment variable.")
 
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel(self.model_name)

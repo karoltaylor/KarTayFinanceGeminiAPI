@@ -16,9 +16,7 @@ class TransactionRecord(BaseModel):
     transaction_amount: float = Field(..., description="Total transaction amount")
     fee: float = Field(default=0.0, ge=0, description="Transaction fee")
     currency: str = Field(..., min_length=1, max_length=10, description="Currency code")
-    transaction_type: str = Field(
-        ..., description="Type of transaction (buy, sell, dividend, etc.)"
-    )
+    transaction_type: str = Field(..., description="Type of transaction (buy, sell, dividend, etc.)")
 
     @field_validator("asset_price", "volume", "transaction_amount")
     @classmethod
@@ -136,12 +134,8 @@ class FinancialDataModel:
         """Get summary statistics of the data."""
         return {
             "total_records": len(self.df),
-            "unique_assets": (
-                self.df["asset_name"].nunique() if len(self.df) > 0 else 0
-            ),
-            "total_transaction_amount": (
-                self.df["transaction_amount"].sum() if len(self.df) > 0 else 0.0
-            ),
+            "unique_assets": (self.df["asset_name"].nunique() if len(self.df) > 0 else 0),
+            "total_transaction_amount": (self.df["transaction_amount"].sum() if len(self.df) > 0 else 0.0),
             "total_fees": self.df["fee"].sum() if len(self.df) > 0 else 0.0,
             "date_range": {
                 "min": self.df["date"].min() if len(self.df) > 0 else None,

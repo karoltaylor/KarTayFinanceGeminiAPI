@@ -60,27 +60,19 @@ class TableDetector:
             return 0.0
 
         # Factor 1: Non-null/non-empty values (weight: 30%)
-        non_null_count = sum(
-            1 for val in row if val is not None and str(val).strip() != ""
-        )
+        non_null_count = sum(1 for val in row if val is not None and str(val).strip() != "")
         non_null_ratio = non_null_count / len(row)
         score += non_null_ratio * 0.3
 
         # Factor 2: String values (weight: 25%)
-        string_count = sum(
-            1 for val in row if isinstance(val, str) and val.strip() != ""
-        )
+        string_count = sum(1 for val in row if isinstance(val, str) and val.strip() != "")
         string_ratio = string_count / len(row)
         score += string_ratio * 0.25
 
         # Factor 3: Unique values (weight: 20%)
-        non_null_values = [
-            val for val in row if val is not None and str(val).strip() != ""
-        ]
+        non_null_values = [val for val in row if val is not None and str(val).strip() != ""]
         if non_null_values:
-            unique_ratio = len(set(str(v) for v in non_null_values)) / len(
-                non_null_values
-            )
+            unique_ratio = len(set(str(v) for v in non_null_values)) / len(non_null_values)
             score += unique_ratio * 0.2
 
         # Factor 4: Subsequent rows have numeric data (weight: 25%)

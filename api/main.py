@@ -95,8 +95,7 @@ app.add_middleware(
     allow_headers=[
         "Content-Type",  # For JSON request bodies
         "Accept",  # For response content negotiation
-        "X-User-ID",  # Custom auth header
-        "Authorization",  # For future OAuth token support
+        "Authorization",  # Firebase auth token
     ],
 )
 
@@ -132,9 +131,7 @@ async def enforce_https(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
 
     if Settings.ENFORCE_HTTPS:
-        response.headers["Strict-Transport-Security"] = (
-            "max-age=31536000; includeSubDomains"
-        )
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
     return response
 

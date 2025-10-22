@@ -44,9 +44,7 @@ class ExcelLoader(BaseFileLoader):
                 wb.close()
             else:
                 # For .xls files, fall back to reading a small DataFrame
-                df = pd.read_excel(
-                    filepath, sheet_name=0, header=None, nrows=max_rows, engine="xlrd"
-                )
+                df = pd.read_excel(filepath, sheet_name=0, header=None, nrows=max_rows, engine="xlrd")
                 for _, row in df.iterrows():
                     yield row.tolist()
 

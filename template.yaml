@@ -99,7 +99,7 @@ Resources:
       # Enable CORS
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,X-User-ID,Authorization,Accept'"
+        AllowHeaders: "'Content-Type,Authorization,Accept'"
         AllowOrigin: !Sub
           - "'${Origins}'"
           - Origins: !Join [',', !Ref AllowedOrigins]

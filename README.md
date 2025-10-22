@@ -6,7 +6,7 @@ A FastAPI application for processing financial transaction files with AI-powered
 
 - 📊 **AI-Powered Column Mapping**: Uses Google Gemini to intelligently map file columns to transaction schema
 - ⚡ **Smart Caching**: Per-user column mapping cache (99% faster for repeated file formats)
-- 🔐 **Secure Authentication**: Firebase JWT tokens with backward-compatible X-User-ID
+- 🔐 **Secure Authentication**: Firebase JWT tokens
 - 💾 **MongoDB Storage**: User-isolated data storage with optimized queries
 - 🎯 **Modular API**: Clean router-based architecture for easy maintenance
 - 🧪 **Comprehensive Testing**: 60+ tests with 79% coverage, fast mocked AI mode

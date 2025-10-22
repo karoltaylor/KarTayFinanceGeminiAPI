@@ -22,24 +22,16 @@ router = APIRouter(prefix="/api/users", tags=["Authentication"])
 class UserRegister(BaseModel):
     """User registration request for OAuth providers (Google, Meta, etc.)."""
 
-    email: str = Field(
-        ..., description="User email from OAuth provider", min_length=3, max_length=255
-    )
+    email: str = Field(..., description="User email from OAuth provider", min_length=3, max_length=255)
     username: str = Field(
         ...,
         description="Username (can be derived from email)",
         min_length=3,
         max_length=50,
     )
-    full_name: Optional[str] = Field(
-        None, description="User's full name", max_length=200
-    )
-    oauth_provider: Optional[str] = Field(
-        None, description="OAuth provider (google, meta, etc.)", max_length=50
-    )
-    oauth_id: Optional[str] = Field(
-        None, description="Unique ID from OAuth provider", max_length=255
-    )
+    full_name: Optional[str] = Field(None, description="User's full name", max_length=200)
+    oauth_provider: Optional[str] = Field(None, description="OAuth provider (google, meta, etc.)", max_length=50)
+    oauth_id: Optional[str] = Field(None, description="Unique ID from OAuth provider", max_length=255)
 
 
 # ==============================================================================
@@ -58,7 +50,7 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
     3. Frontend calls this endpoint with user data
     4. Backend creates new user or returns existing user's ID
 
-    **Authentication:** This endpoint does NOT require X-User-ID header (it generates the user_id).
+    **Authentication:** This endpoint does NOT require Firebase token (it generates the user_id).
 
     **Request Body:**
     - `email` (required): User email from OAuth provider
@@ -68,7 +60,7 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
     - `oauth_id` (optional): User ID from OAuth provider
 
     **Returns:**
-    - `user_id`: Use this in X-User-ID header for subsequent requests
+    - `user_id`: Use this in Firebase token for subsequent requests
     - `is_new_user`: true if user was just created, false if existing user
 
     **Errors:**
@@ -117,16 +109,12 @@ async def register_user(user_data: UserRegister, db: Database = Depends(get_db))
 
         # Sanitize username - replace spaces and invalid chars with underscores
         sanitized_username = user_data.username.strip().lower()
-        sanitized_username = "".join(
-            c if (c.isalnum() or c in "_-") else "_" for c in sanitized_username
-        )
+        sanitized_username = "".join(c if (c.isalnum() or c in "_-") else "_" for c in sanitized_username)
 
         # If username is still invalid, generate from email
         if not sanitized_username or len(sanitized_username) < 3:
             sanitized_username = user_data.email.split("@")[0].lower()
-            sanitized_username = "".join(
-                c if (c.isalnum() or c in "_-") else "_" for c in sanitized_username
-            )
+            sanitized_username = "".join(c if (c.isalnum() or c in "_-") else "_" for c in sanitized_username)
 
         # Check if username is taken, add suffix if needed
         base_username = sanitized_username
@@ -170,14 +158,15 @@ async def get_current_user_info(
     """
     Get information about the currently authenticated user.
 
-    **Authentication Required:** Include `X-User-ID` header with your user ID.
+    **Authentication Required:** Include Firebase ID token in Authorization header:
+    `Authorization: Bearer <firebase_token>`
 
     **Returns:**
     - User information including which database they're stored in
     - Helpful for debugging which environment you're connected to
 
     **Errors:**
-    - 401: Invalid or missing X-User-ID header
+    - 401: Invalid or missing Firebase token
     - 404: User not found in current database
     """
     user = db.users.find_one({"_id": user_id})

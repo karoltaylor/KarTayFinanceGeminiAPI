@@ -41,7 +41,8 @@ async def upload_transactions(
     """
     Upload and process a transaction file with AI-powered column mapping.
 
-    **Authentication Required:** Include `X-User-ID` header with your user ID.
+    **Authentication Required:** Include Firebase ID token in Authorization header:
+    `Authorization: Bearer <firebase_token>`
 
     **Complete Processing Pipeline:**
     1. Load file and detect header row
@@ -74,7 +75,7 @@ async def upload_transactions(
 
     **Errors:**
     - 400: Unsupported file type
-    - 401: Invalid or missing X-User-ID header
+    - 401: Invalid or missing Firebase token
     - 404: Wallet not found
     - 422: No valid transactions in file
     - 500: Processing error
@@ -85,13 +86,9 @@ async def upload_transactions(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid wallet_id format")
 
-    wallet = db.wallets.find_one(
-        {"_id": wallet_obj_id, "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}
-    )
+    wallet = db.wallets.find_one({"_id": wallet_obj_id, "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]})
     if not wallet:
-        raise HTTPException(
-            status_code=404, detail="Wallet not found or you don't have access to it"
-        )
+        raise HTTPException(status_code=404, detail="Wallet not found or you don't have access to it")
 
     # Log transaction upload start
     logger.info(
@@ -115,14 +112,11 @@ async def upload_transactions(
         if file_extension not in [".csv", ".txt", ".xls", ".xlsx"]:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file type: {file_extension}. "
-                f"Supported: .csv, .txt, .xls, .xlsx",
+                detail=f"Unsupported file type: {file_extension}. " f"Supported: .csv, .txt, .xls, .xlsx",
             )
 
         # Save uploaded file to temporary location
-        with tempfile.NamedTemporaryFile(
-            delete=False, suffix=file_extension
-        ) as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
             content = await file.read()
             temp_file.write(content)
             temp_filepath = temp_file.name
@@ -142,10 +136,7 @@ async def upload_transactions(
         # Insert successful transactions into MongoDB
         inserted_count = 0
         if transactions:
-            transaction_dicts = [
-                t.model_dump(by_alias=True, exclude={"id"}, mode="python")
-                for t in transactions
-            ]
+            transaction_dicts = [t.model_dump(by_alias=True, exclude={"id"}, mode="python") for t in transactions]
             result = db.transactions.insert_many(transaction_dicts)
             inserted_count = len(result.inserted_ids)
 
@@ -176,8 +167,7 @@ async def upload_transactions(
         if inserted_count == 0 and errors_count == 0:
             raise HTTPException(
                 status_code=422,
-                detail="No valid transactions could be created from the file. "
-                "Check file format and data quality.",
+                detail="No valid transactions could be created from the file. " "Check file format and data quality.",
             )
 
         # Get statistics
@@ -292,7 +282,8 @@ async def list_transactions(
     """
     List transactions for a specific wallet with pagination.
 
-    **Authentication Required:** Include `X-User-ID` header with your user ID.
+    **Authentication Required:** Include Firebase ID token in Authorization header:
+    `Authorization: Bearer <firebase_token>`
 
     **Query Parameters:**
     - `wallet_id` (required): Filter by wallet ID
@@ -305,7 +296,7 @@ async def list_transactions(
 
     **Errors:**
     - 400: Invalid wallet_id format
-    - 401: Invalid or missing X-User-ID header
+    - 401: Invalid or missing Firebase token
     - 404: Wallet not found
     """
     # Validate wallet_id and ownership
@@ -315,17 +306,13 @@ async def list_transactions(
         raise HTTPException(status_code=400, detail="Invalid wallet_id format")
 
     # Verify wallet exists and belongs to user - handle both ObjectId and string formats
-    wallet = db.wallets.find_one(
-        {"_id": wallet_obj_id, "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}
-    )
+    wallet = db.wallets.find_one({"_id": wallet_obj_id, "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]})
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet not found")
 
     # Query transactions - handle both ObjectId and string formats
     transactions = list(
-        db.transactions.find(
-            {"$or": [{"wallet_id": wallet_obj_id}, {"wallet_id": wallet_id}]}
-        )
+        db.transactions.find({"$or": [{"wallet_id": wallet_obj_id}, {"wallet_id": wallet_id}]})
         .sort("date", -1)
         .skip(skip)
         .limit(limit + 1)  # Fetch one extra to check if there are more
@@ -379,15 +366,9 @@ async def list_transactions(
 
 @router.get("/errors", summary="List transaction errors", response_model=None)
 async def list_transaction_errors(
-    wallet_id: Annotated[
-        Optional[str], Query(description="Filter by wallet ID")
-    ] = None,
-    resolved: Annotated[
-        Optional[bool], Query(description="Filter by resolved status")
-    ] = None,
-    limit: Annotated[
-        int, Query(description="Maximum errors to return", ge=1, le=1000)
-    ] = 100,
+    wallet_id: Annotated[Optional[str], Query(description="Filter by wallet ID")] = None,
+    resolved: Annotated[Optional[bool], Query(description="Filter by resolved status")] = None,
+    limit: Annotated[int, Query(description="Maximum errors to return", ge=1, le=1000)] = 100,
     skip: Annotated[int, Query(description="Number of errors to skip", ge=0)] = 0,
     user_id: ObjectId = Depends(get_current_user),
     db: Database = Depends(get_db),
@@ -395,7 +376,8 @@ async def list_transaction_errors(
     """
     List transaction errors for manual correction.
 
-    **Authentication Required:** Include `X-User-ID` header with your user ID.
+    **Authentication Required:** Include Firebase ID token in Authorization header:
+    `Authorization: Bearer <firebase_token>`
 
     **Query Parameters:**
     - `wallet_id`: Filter by specific wallet ID (optional)
@@ -409,7 +391,7 @@ async def list_transaction_errors(
     - Each error includes: row index, raw data, error message, error type
 
     **Errors:**
-    - 401: Invalid or missing X-User-ID header
+    - 401: Invalid or missing Firebase token
     - 404: Wallet not found
     """
     query = {"user_id": user_id}
@@ -425,16 +407,12 @@ async def list_transaction_errors(
         if not wallet:
             raise HTTPException(status_code=404, detail="Wallet not found")
 
-        query["wallet_name"] = wallet[
-            "name"
-        ]  # Still filter by name in errors collection for now
+        query["wallet_name"] = wallet["name"]  # Still filter by name in errors collection for now
 
     if resolved is not None:
         query["resolved"] = resolved
 
-    errors = list(
-        db.transaction_errors.find(query).sort("created_at", -1).skip(skip).limit(limit)
-    )
+    errors = list(db.transaction_errors.find(query).sort("created_at", -1).skip(skip).limit(limit))
 
     # Convert ObjectIds to strings
     for error in errors:
@@ -449,9 +427,7 @@ async def list_transaction_errors(
 # ==============================================================================
 
 
-@router.delete(
-    "/wallet/{wallet_id}", summary="Delete wallet transactions", response_model=None
-)
+@router.delete("/wallet/{wallet_id}", summary="Delete wallet transactions", response_model=None)
 async def delete_wallet_transactions(
     wallet_id: Annotated[str, PathParam(description="ID of the wallet")],
     user_id: ObjectId = Depends(get_current_user),
@@ -460,7 +436,8 @@ async def delete_wallet_transactions(
     """
     Delete all transactions for a specific wallet.
 
-    **Authentication Required:** Include `X-User-ID` header with your user ID.
+    **Authentication Required:** Include Firebase ID token in Authorization header:
+    `Authorization: Bearer <firebase_token>`
 
     **Path Parameters:**
     - `wallet_id`: ID of the wallet whose transactions to delete
@@ -471,7 +448,7 @@ async def delete_wallet_transactions(
 
     **Errors:**
     - 400: Invalid wallet_id format
-    - 401: Invalid or missing X-User-ID header
+    - 401: Invalid or missing Firebase token
     - 404: Wallet not found or not owned by user
     """
     # Validate wallet_id format
@@ -481,18 +458,12 @@ async def delete_wallet_transactions(
         raise HTTPException(status_code=400, detail="Invalid wallet_id format")
 
     # Find wallet (must belong to the user)
-    wallet = db.wallets.find_one(
-        {"_id": wallet_obj_id, "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}
-    )
+    wallet = db.wallets.find_one({"_id": wallet_obj_id, "$or": [{"user_id": user_id}, {"user_id": str(user_id)}]})
     if not wallet:
-        raise HTTPException(
-            status_code=404, detail="Wallet not found or not owned by user"
-        )
+        raise HTTPException(status_code=404, detail="Wallet not found or not owned by user")
 
     # Delete transactions - handle both ObjectId and string formats
-    result = db.transactions.delete_many(
-        {"$or": [{"wallet_id": wallet_obj_id}, {"wallet_id": wallet_id}]}
-    )
+    result = db.transactions.delete_many({"$or": [{"wallet_id": wallet_obj_id}, {"wallet_id": wallet_id}]})
 
     return {
         "status": "success",

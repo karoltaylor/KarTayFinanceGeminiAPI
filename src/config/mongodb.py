@@ -27,7 +27,7 @@ def _get_active_env_file():
 def _load_env_once(
     env_file_override: Optional[str] = None,
     is_lambda_override: Optional[bool] = None,
-    is_ci_override: Optional[bool] = None
+    is_ci_override: Optional[bool] = None,
 ):
     """Load environment variables once and return them as a dictionary."""
     # Only try to load .env files if not running in Lambda
@@ -35,9 +35,7 @@ def _load_env_once(
     is_lambda = is_lambda_override if is_lambda_override is not None else bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 
     print(f"[DEBUG] Environment detection - Is Lambda: {is_lambda}")
-    print(
-        f"[DEBUG] AWS_LAMBDA_FUNCTION_NAME: {os.getenv('AWS_LAMBDA_FUNCTION_NAME', 'Not set')}"
-    )
+    print(f"[DEBUG] AWS_LAMBDA_FUNCTION_NAME: {os.getenv('AWS_LAMBDA_FUNCTION_NAME', 'Not set')}")
 
     env_vars = {}
 
@@ -70,9 +68,7 @@ def _load_env_once(
                             env_vars[key] = value
 
                 # Also load into environment using load_dotenv
-                load_dotenv(
-                    env_file, override=False
-                )  # Don't override existing env vars
+                load_dotenv(env_file, override=False)  # Don't override existing env vars
             except Exception as e:
                 print(f"[DEBUG] Error loading env file {env_file}: {e}")
                 # Fall back to existing environment variables
@@ -81,9 +77,7 @@ def _load_env_once(
         # If no .env file was loaded or file doesn't exist,
         # check for MongoDB-related environment variables only in CI/container environments
         if not env_vars:
-            print(
-                "[DEBUG] No .env file loaded, checking existing environment variables"
-            )
+            print("[DEBUG] No .env file loaded, checking existing environment variables")
             # Only fall back to environment variables if we're likely in a CI/container environment
             # Check for common CI environment indicators
             ci_indicators = [
@@ -93,12 +87,14 @@ def _load_env_once(
                 "JENKINS_URL",
                 "BUILD_NUMBER",
             ]
-            is_ci = is_ci_override if is_ci_override is not None else any(os.getenv(indicator) for indicator in ci_indicators)
+            is_ci = (
+                is_ci_override
+                if is_ci_override is not None
+                else any(os.getenv(indicator) for indicator in ci_indicators)
+            )
 
             if is_ci:
-                print(
-                    "[DEBUG] Detected CI environment, checking for MongoDB environment variables"
-                )
+                print("[DEBUG] Detected CI environment, checking for MongoDB environment variables")
                 mongodb_vars = ["MONGODB_URL", "MONGODB_DATABASE"]
                 for var in mongodb_vars:
                     value = os.getenv(var)
@@ -106,9 +102,7 @@ def _load_env_once(
                         env_vars[var] = value
                         print(f"[DEBUG] Found {var} in environment")
             else:
-                print(
-                    "[DEBUG] Not in CI environment, skipping environment variable fallback"
-                )
+                print("[DEBUG] Not in CI environment, skipping environment variable fallback")
     else:
         print("[DEBUG] Running in Lambda - skipping .env file loading")
 
@@ -134,9 +128,7 @@ class MongoDBConfig:
             url = os.getenv("MONGODB_URL")
 
             # Log environment variable status (mask sensitive data)
-            print(
-                f"[DEBUG] MONGODB_URL environment variable: {'SET' if url else 'NOT SET'}"
-            )
+            print(f"[DEBUG] MONGODB_URL environment variable: {'SET' if url else 'NOT SET'}")
             if url:
                 # Mask the URL for logging
                 if "@" in url:
@@ -207,9 +199,7 @@ class MongoDBConfig:
     def get_mongodb_url(cls) -> str:
         """Get MongoDB URL from environment."""
         url = os.getenv("MONGODB_URL")
-        print(
-            f"[DEBUG] get_mongodb_url() called - URL is {'SET' if url else 'NOT SET'}"
-        )
+        print(f"[DEBUG] get_mongodb_url() called - URL is {'SET' if url else 'NOT SET'}")
         return url
 
     @classmethod

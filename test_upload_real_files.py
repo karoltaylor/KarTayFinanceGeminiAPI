@@ -53,7 +53,7 @@ def test_file_upload(filepath: Path, user_id: str):
                 "transaction_type": "buy",
                 "asset_type": "stock",
             }
-            headers = {"X-User-ID": user_id}
+            headers = {"Authorization": f"Bearer {user_id}"}
 
             response = requests.post(
                 f"{API_URL}/api/transactions/upload",
@@ -98,7 +98,7 @@ def check_transaction_errors(user_id: str):
     print("=" * 60)
 
     try:
-        headers = {"X-User-ID": user_id}
+        headers = {"Authorization": f"Bearer {user_id}"}
         response = requests.get(
             f"{API_URL}/api/transactions/errors", headers=headers, timeout=30
         )
@@ -131,7 +131,7 @@ def check_database_stats(user_id: str):
     print("=" * 60)
 
     try:
-        headers = {"X-User-ID": user_id}
+        headers = {"Authorization": f"Bearer {user_id}"}
 
         # Get transactions count
         response = requests.get(
