@@ -307,7 +307,12 @@ class TestLoadEnvOnce:
             "src.config.mongodb.load_dotenv"
         ), patch(
             "src.config.mongodb.os.getenv"
-        ) as mock_getenv:
+        ) as mock_getenv, patch(
+            "src.config.mongodb.Path"
+        ) as mock_path:
+            # Mock Path.exists() to return True
+            mock_path.return_value.exists.return_value = True
+            
             # Mock CI environment variables to be False
             mock_getenv.side_effect = lambda key, default=None: {
                 "AWS_LAMBDA_FUNCTION_NAME": None,
@@ -399,7 +404,12 @@ class TestLoadEnvOnce:
             "src.config.mongodb.load_dotenv"
         ), patch(
             "src.config.mongodb.os.getenv"
-        ) as mock_getenv:
+        ) as mock_getenv, patch(
+            "src.config.mongodb.Path"
+        ) as mock_path:
+            # Mock Path.exists() to return True
+            mock_path.return_value.exists.return_value = True
+            
             # Mock CI environment variables to be False
             mock_getenv.side_effect = lambda key, default=None: {
                 "AWS_LAMBDA_FUNCTION_NAME": None,
@@ -429,7 +439,12 @@ class TestLoadEnvOnce:
             "src.config.mongodb.load_dotenv"
         ), patch(
             "src.config.mongodb.os.getenv"
-        ) as mock_getenv:
+        ) as mock_getenv, patch(
+            "src.config.mongodb.Path"
+        ) as mock_path:
+            # Mock Path.exists() to return True
+            mock_path.return_value.exists.return_value = True
+            
             # Mock CI environment variables to be False
             mock_getenv.side_effect = lambda key, default=None: {
                 "AWS_LAMBDA_FUNCTION_NAME": None,
@@ -458,7 +473,12 @@ class TestLoadEnvOnce:
             "src.config.mongodb.load_dotenv"
         ), patch(
             "src.config.mongodb.os.getenv"
-        ) as mock_getenv:
+        ) as mock_getenv, patch(
+            "src.config.mongodb.Path"
+        ) as mock_path:
+            # Mock Path.exists() to return True
+            mock_path.return_value.exists.return_value = True
+            
             # Mock CI environment variables to be False
             mock_getenv.side_effect = lambda key, default=None: {
                 "AWS_LAMBDA_FUNCTION_NAME": None,
@@ -487,7 +507,12 @@ class TestLoadEnvOnce:
             "src.config.mongodb.load_dotenv"
         ), patch(
             "src.config.mongodb.os.getenv"
-        ) as mock_getenv:
+        ) as mock_getenv, patch(
+            "src.config.mongodb.Path"
+        ) as mock_path:
+            # Mock Path.exists() to return True
+            mock_path.return_value.exists.return_value = True
+            
             # Mock CI environment variables to be False
             mock_getenv.side_effect = lambda key, default=None: {
                 "AWS_LAMBDA_FUNCTION_NAME": None,
