@@ -647,10 +647,10 @@ class TestListTransactionErrors:
             db=mock_db,
         )
 
-        # Assert - verify query includes wallet_name
+        # Assert - verify query includes wallet_id
         call_args = mock_db.transaction_errors.find.call_args[0][0]
-        assert "wallet_name" in call_args
-        assert call_args["wallet_name"] == "Test Wallet"
+        assert "wallet_id" in call_args
+        assert call_args["wallet_id"] == wallet_id
 
     @pytest.mark.asyncio
     async def test_list_errors_filter_by_resolved(self):
