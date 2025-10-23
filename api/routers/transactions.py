@@ -2,6 +2,7 @@
 
 import tempfile
 import os
+import time
 from pathlib import Path
 from datetime import datetime, UTC
 from fastapi import (
@@ -24,6 +25,43 @@ from src.utils.logger import logger
 from api.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
+
+
+def _cleanup_temp_file(filepath: str, max_retries: int = 3, delay: float = 0.1) -> bool:
+    """
+    Safely delete temp file with retries for Windows file locking.
+
+    Args:
+        filepath: Path to the temporary file to delete
+        max_retries: Maximum number of deletion attempts
+        delay: Base delay in seconds between retries (exponential backoff)
+
+    Returns:
+        True if file was deleted successfully, False otherwise
+    """
+    for attempt in range(max_retries):
+        try:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+                return True
+        except PermissionError:
+            if attempt < max_retries - 1:
+                time.sleep(delay * (attempt + 1))  # Exponential backoff
+            else:
+                logger.warning(
+                    "transaction_upload",
+                    f"Failed to delete temp file after {max_retries} attempts",
+                    context={"filepath": filepath},
+                )
+                return False
+        except Exception as e:
+            logger.warning(
+                "transaction_upload",
+                f"Unexpected error deleting temp file: {str(e)}",
+                context={"filepath": filepath},
+            )
+            return False
+    return True
 
 
 # ==============================================================================
@@ -109,6 +147,8 @@ async def upload_transactions(
     )
 
     temp_file = None
+    temp_filepath = None
+    response_data = None
 
     try:
         # Validate file type
@@ -159,7 +199,7 @@ async def upload_transactions(
             for error_rec in error_records:
                 error_doc = TransactionError(
                     user_id=user_id,
-                    wallet_name=wallet["name"],
+                    wallet_id=wallet_obj_id,
                     filename=file.filename,
                     row_index=error_rec["row_index"],
                     raw_data=error_rec["raw_data"],
@@ -239,7 +279,8 @@ async def upload_transactions(
                     }
                 )
 
-        return {
+        # Build response data before finally block
+        response_data = {
             "status": "success" if inserted_count > 0 else "partial_failure",
             "message": f"Processed {inserted_count} transactions successfully, {errors_count} failed",
             "data": {
@@ -269,9 +310,12 @@ async def upload_transactions(
         )
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
     finally:
-        # Clean up temporary file
-        if temp_file and os.path.exists(temp_filepath):
-            os.unlink(temp_filepath)
+        # Clean up temporary file safely with retries
+        if temp_filepath:
+            _cleanup_temp_file(temp_filepath)
+
+    # Return response after cleanup (even if cleanup failed)
+    return response_data
 
 
 # ==============================================================================
@@ -428,9 +472,7 @@ async def list_transaction_errors(
         if not wallet:
             raise HTTPException(status_code=404, detail="Wallet not found")
 
-        query["wallet_name"] = wallet[
-            "name"
-        ]  # Still filter by name in errors collection for now
+        query["wallet_id"] = wallet_obj_id
 
     if resolved is not None:
         query["resolved"] = resolved

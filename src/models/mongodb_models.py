@@ -407,7 +407,7 @@ class TransactionError(BaseModel):
 
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     user_id: PyObjectId = Field(..., description="User who attempted the import")
-    wallet_name: str = Field(..., description="Target wallet name")
+    wallet_id: PyObjectId = Field(..., description="Target wallet ID")
     filename: str = Field(..., description="Original filename")
     row_index: int = Field(..., description="Row number in original file")
     raw_data: dict = Field(..., description="Raw row data that failed")
