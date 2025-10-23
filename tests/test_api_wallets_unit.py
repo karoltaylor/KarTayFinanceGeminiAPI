@@ -460,4 +460,3 @@ class TestWalletCreate:
         """Test that description exceeding max length fails validation."""
         with pytest.raises(Exception):  # Pydantic ValidationError
             WalletCreate(name="Test", description="A" * 1001)  # Max is 1000
-

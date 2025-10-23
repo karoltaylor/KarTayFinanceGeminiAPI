@@ -836,4 +836,3 @@ class TestDeleteWalletTransactions:
         assert "$or" in call_args
         assert {"wallet_id": wallet_id} in call_args["$or"]
         assert {"wallet_id": str(wallet_id)} in call_args["$or"]
-
