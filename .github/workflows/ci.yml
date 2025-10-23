@@ -44,8 +44,8 @@ jobs:
 
     - name: Set test environment variables
       run: |
-        echo "MONGODB_URL=mongodb://localhost:27017/" >> $GITHUB_ENV
-        echo "MONGODB_DATABASE=financial_tracker" >> $GITHUB_ENV
+        echo "MONGODB_URL=mongodb://localhost:27017" >> $GITHUB_ENV
+        echo "MONGODB_DATABASE=test_db" >> $GITHUB_ENV
         echo "GOOGLE_API_KEY=test_api_key_for_ci" >> $GITHUB_ENV
         echo "GENAI_MODEL=gemini-1.5-flash-latest" >> $GITHUB_ENV
 
