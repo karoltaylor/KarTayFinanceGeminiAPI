@@ -51,9 +51,6 @@ jobs:
 
 
     - name: Run unit tests with coverage
-      env:
-        MONGODB_URL: mongodb://localhost:27017
-        MONGODB_DATABASE: test_db
       run: |
         pytest -m unit --cov=src --cov=api --cov-branch --cov-report=xml --cov-report=term-missing
 
